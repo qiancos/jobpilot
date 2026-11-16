@@ -51,6 +51,7 @@ object RefineRunner {
             Thread.sleep(400)
             val jd = JdReader.read()
             onP(P(i, jobs.size, job.company, "读 JD ${jd.length} 字", done))
+            if (jd.length >= 80) db.saveJd(job.id, jd)
             if (useLlm) {
                 val v = LlmScorer.score(ctx, job, resume.text, jd)
                 if (v.ok) {

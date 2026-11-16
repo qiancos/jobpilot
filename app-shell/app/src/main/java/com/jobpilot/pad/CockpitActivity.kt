@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jobpilot.pad.data.Db
 import com.jobpilot.pad.data.Job
+import com.jobpilot.pad.data.ScoreRow
 import com.jobpilot.pad.exec.AppExecutor
 import com.jobpilot.pad.exec.AutoScorer
 import com.jobpilot.pad.exec.BatchRunner
@@ -113,6 +114,7 @@ fun CockpitScreen(modifier: Modifier = Modifier) {
     var tick by remember { mutableIntStateOf(0) }
     var execBusy by remember { mutableStateOf(false) }
     var aiMenu by remember { mutableStateOf(false) }
+    var detail by remember { mutableStateOf<Job?>(null) }
 
     // 进来先按简历给没分过的岗位补分
     LaunchedEffect(Unit) {
@@ -177,8 +179,47 @@ fun CockpitScreen(modifier: Modifier = Modifier) {
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val wide = maxWidth >= 860.dp
+        val detailWide = maxWidth >= 900.dp
 
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp)) {
+            val open = detail
+            if (open != null) {
+                val jd = remember(open.id, tick) { db.jobJd(open.id) }
+                val sc = remember(open.id, tick) { db.scoreRow(open.id) }
+                val idx = visible.indexOfFirst { it.id == open.id }
+                JobDetail(
+                    modifier = Modifier.weight(1f),
+                    job = open,
+                    jd = jd,
+                    score = sc,
+                    index = if (idx >= 0) idx + 1 else 1,
+                    wide = detailWide,
+                    onBack = { detail = null },
+                    onIgnore = {
+                        db.setSelected(open.id, false)
+                        detail = null
+                        tick++
+                    },
+                    onBlacklist = {
+                        db.setBlacklisted(open.company, true)
+                        db.setSelected(open.id, false)
+                        Toast.makeText(ctx, "已加入黑名单：${open.company}", Toast.LENGTH_SHORT).show()
+                        detail = null
+                        tick++
+                    },
+                    onSelect = {
+                        db.setSelected(open.id, true)
+                        detail = null
+                        tick++
+                        runCatching {
+                            ctx.startActivity(
+                                Intent(ctx, StubActivity::class.java)
+                                    .putExtra("dest", NavDest.SKILL.name)
+                            )
+                        }
+                    }
+                )
+            } else {
             HeaderRow(
                 total = jobs.size,
                 selected = selectedCount,
@@ -222,7 +263,8 @@ fun CockpitScreen(modifier: Modifier = Modifier) {
                         applied = appliedIds,
                         emptyHint = emptyHint,
                         onToggle = { job, on -> db.setSelected(job.id, on); tick++ },
-                        onToggleAll = toggleAll
+                        onToggleAll = toggleAll,
+                        onOpen = { detail = it }
                     )
                     Column(
                         Modifier.width(330.dp).fillMaxHeight().verticalScroll(rememberScrollState()),
@@ -252,7 +294,8 @@ fun CockpitScreen(modifier: Modifier = Modifier) {
                     applied = appliedIds,
                     emptyHint = emptyHint,
                     onToggle = { job, on -> db.setSelected(job.id, on); tick++ },
-                    onToggleAll = toggleAll
+                    onToggleAll = toggleAll,
+                    onOpen = { detail = it }
                 )
             }
 
@@ -292,9 +335,9 @@ fun CockpitScreen(modifier: Modifier = Modifier) {
                                 val r = AppExecutor.deliver(
                                     target, greetingFor(ctx, target), dryRun = false, waitBossMs = 30_000L
                                 )
-                                val detail = r.steps.lastOrNull { !it.ok }?.detail
+                                val note = r.steps.lastOrNull { !it.ok }?.detail
                                     ?: r.steps.lastOrNull()?.detail
-                                db.recordDelivery(target, r.level, detail)
+                                db.recordDelivery(target, r.level, note)
                                 showResult(ctx, "投递结果", r) { execBusy = false; tick++ }
                             }.start()
                         }
@@ -313,6 +356,7 @@ fun CockpitScreen(modifier: Modifier = Modifier) {
                     }
                 }
             )
+            }
         }
     }
 
@@ -816,6 +860,7 @@ private fun JobTable(
     emptyHint: String,
     onToggle: (Job, Boolean) -> Unit,
     onToggleAll: (Boolean) -> Unit,
+    onOpen: (Job) -> Unit,
 ) {
     Column(modifier.clip(RoundedCornerShape(16.dp)).background(CARD)) {
         TableHeader(
@@ -839,7 +884,8 @@ private fun JobTable(
                         job = job,
                         score = scores[job.id],
                         applied = job.id in applied,
-                        onToggle = { onToggle(job, it) }
+                        onToggle = { onToggle(job, it) },
+                        onOpen = { onOpen(job) }
                     )
                     Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF1F4F9)))
                 }
@@ -876,6 +922,7 @@ private fun JobTableRow(
     score: Int?,
     applied: Boolean,
     onToggle: (Boolean) -> Unit,
+    onOpen: () -> Unit,
 ) {
     val (atText, atToday) = collectLabel(job.collectedAt)
     val place = listOf(job.company, job.area).filter { it.isNotBlank() }.joinToString(" · ")
@@ -885,11 +932,14 @@ private fun JobTableRow(
         Modifier
             .fillMaxWidth()
             .height(54.dp)
-            .clickable { onToggle(!job.selected) }
+            .clickable { onOpen() }
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.width(30.dp)) { CheckSquare(job.selected) }
+        Box(
+            Modifier.width(30.dp).clickable { onToggle(!job.selected) },
+            contentAlignment = Alignment.CenterStart
+        ) { CheckSquare(job.selected) }
 
         Column(Modifier.weight(1.6f).padding(end = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1171,6 +1221,324 @@ private fun NoteCard(selected: Int) {
     }
 }
 
+// ------------------------------------------------------------------ 原型 s4 岗位详情
+
+@Composable
+private fun JobDetail(
+    modifier: Modifier,
+    job: Job,
+    jd: String,
+    score: ScoreRow?,
+    index: Int,
+    wide: Boolean,
+    onBack: () -> Unit,
+    onIgnore: () -> Unit,
+    onBlacklist: () -> Unit,
+    onSelect: () -> Unit,
+) {
+    val (atText, _) = collectLabel(job.collectedAt)
+    val total = score?.total ?: 0
+
+    Column(modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "${job.company} · ${job.title}",
+                    fontSize = 21.sp, fontWeight = FontWeight.Bold, color = INK,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "待投清单 / 第 $index 家 · " + listOf(
+                        job.area, job.salary.ifBlank { "面议" }, "采集 $atText"
+                    ).filter { it.isNotBlank() }.joinToString(" · "),
+                    fontSize = 11.sp, color = SUB, modifier = Modifier.padding(top = 3.dp)
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                GhostButton("← 清单", onBack)
+                GhostButton("忽略", onIgnore)
+                GhostButton("黑名单", onBlacklist)
+                DarkPrimary(if (job.selected) "已在待投 · 写话术" else "加入待投并写话术", true, onSelect)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        if (wide) {
+            Row(
+                Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())
+                ) { JobInfoCard(job, jd, atText) }
+                Column(
+                    Modifier.width(446.dp).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    MatchScoreCard(score, total)
+                    TripleCard(score)
+                }
+            }
+        } else {
+            Column(
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                JobInfoCard(job, jd, atText)
+                MatchScoreCard(score, total)
+                TripleCard(score)
+            }
+        }
+    }
+}
+
+@Composable
+private fun JobInfoCard(job: Job, jd: String, atText: String) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CARD)
+            .padding(18.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GREEN_BG),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    job.company.take(1).ifBlank { "岗" },
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = GREEN
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        job.company.ifBlank { "未知公司" },
+                        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = INK,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                    TagPill(if (job.source == "app") "BOSS App" else "网页降级")
+                    if (job.keyword.isNotBlank()) TagPill(job.keyword)
+                }
+                Text(
+                    listOf(job.area, "HR 招聘", "采集 $atText")
+                        .filter { it.isNotBlank() }.joinToString(" · "),
+                    fontSize = 10.5.sp, color = FAINT, modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    job.salary.ifBlank { "面议" },
+                    fontSize = 20.sp, fontWeight = FontWeight.Bold, color = INK
+                )
+                Text(
+                    "BOSS 直聘", fontSize = 10.sp, color = FAINT,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(LINE))
+        Spacer(Modifier.height(12.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            job.tags.split("/").filter { it.isNotBlank() }.take(6).forEach { TagPill(it) }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Text("JD 原文", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = INK)
+        Spacer(Modifier.height(8.dp))
+        if (jd.isBlank()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFFBFCFE))
+                    .border(1.dp, LINE, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Text(
+                    "还没读过这个岗位的 JD",
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = INK
+                )
+                Text(
+                    "点「AI 精算 → 单条 AI」，把 BOSS 停在这个岗位详情页，" +
+                        "就能把职责与要求抓下来，并按 JD 重新打分。",
+                    fontSize = 10.5.sp, color = SUB, lineHeight = 16.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        } else {
+            Text(
+                jd.take(4000),
+                fontSize = 12.sp, color = Color(0xFF344054), lineHeight = 20.sp
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Text("你需要知道的", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = INK)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MiniTile("地区", job.area.ifBlank { "未写" }, Modifier.weight(1f))
+            MiniTile("薪资", job.salary.ifBlank { "面议" }, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MiniTile("采集来源", if (job.source == "app") "BOSS App" else "网页降级", Modifier.weight(1f))
+            MiniTile("采集时间", atText, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun MiniTile(label: String, value: String, modifier: Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFF7F9FC))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(label, fontSize = 10.sp, color = FAINT)
+        Text(
+            value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = INK,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 3.dp)
+        )
+    }
+}
+
+@Composable
+private fun MatchScoreCard(score: ScoreRow?, total: Int) {
+    val ok = total >= 65
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CARD)
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("匹配打分", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = INK)
+            Spacer(Modifier.width(6.dp))
+            Text("规则 + 简历技能", fontSize = 10.5.sp, color = FAINT)
+            Spacer(Modifier.weight(1f))
+            TagPill("可解释")
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Ring(fraction = total / 100f, top = "$total", bottom = "/ 100")
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    when {
+                        score == null -> "还没打分"
+                        total >= 80 -> "建议直接投"
+                        total >= 65 -> "可以投"
+                        total >= 45 -> "优先级放后"
+                        else -> "建议跳过"
+                    },
+                    fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    color = if (ok) GREEN else AMBER
+                )
+                Text(
+                    "口径：技能命中 + 城市 + 薪资 − 方向/年限扣分；读过 JD 后可精算。",
+                    fontSize = 10.sp, color = FAINT, lineHeight = 15.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(LINE))
+        Spacer(Modifier.height(10.dp))
+        KeywordRow("JD 命中", score?.hit, GREEN, GREEN_BG)
+        Spacer(Modifier.height(6.dp))
+        KeywordRow("JD 缺失", score?.miss, RED, RED_BG)
+    }
+}
+
+@Composable
+private fun KeywordRow(label: String, csv: String?, fg: Color, bg: Color) {
+    val items = csv.orEmpty().split(",").map { it.trim() }.filter { it.isNotBlank() }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, fontSize = 10.sp, color = FAINT, modifier = Modifier.width(56.dp))
+        if (items.isEmpty()) {
+            Text("—", fontSize = 10.sp, color = FAINT)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                items.take(4).forEach {
+                    Text(
+                        it, fontSize = 9.5.sp, color = fg,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(bg)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+                if (items.size > 4) {
+                    Text("+${items.size - 4}", fontSize = 9.5.sp, color = FAINT)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TripleCard(score: ScoreRow?) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CARD)
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("三件套", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = INK)
+            Spacer(Modifier.width(6.dp))
+            Text("优势 / 不足 / 建议", fontSize = 10.5.sp, color = FAINT)
+        }
+        Spacer(Modifier.height(10.dp))
+        TripleBlock("优势", score?.strengths, GREEN, GREEN_BG)
+        Spacer(Modifier.height(8.dp))
+        TripleBlock("不足", score?.gaps, RED, RED_BG)
+        Spacer(Modifier.height(8.dp))
+        TripleBlock("建议", score?.advice, BLUE, Color(0xFFEFF4FF))
+    }
+}
+
+@Composable
+private fun TripleBlock(label: String, text: String?, fg: Color, bg: Color) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .padding(horizontal = 13.dp, vertical = 11.dp)
+    ) {
+        Text(
+            label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = fg
+        )
+        Text(
+            text?.takeIf { it.isNotBlank() } ?: "还没有打分结果",
+            fontSize = 11.5.sp, color = if (text.isNullOrBlank()) FAINT else INK,
+            lineHeight = 17.sp,
+            modifier = Modifier.padding(top = 5.dp)
+        )
+    }
+}
+
 @Composable
 private fun BatchBar(
     selected: Int,
@@ -1288,5 +1656,7 @@ private val GREEN = Color(0xFF16A34A)
 private val GREEN_BG = Color(0xFFE8F7EE)
 private val BLUE = Color(0xFF2563EB)
 private val AMBER = Color(0xFFD97706)
+private val RED = Color(0xFFDC2626)
+private val RED_BG = Color(0xFFFEF2F2)
 private val LINE = Color(0xFFE5E9F0)
 private val NAV = Color(0xFF0F172A)

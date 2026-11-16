@@ -16,19 +16,33 @@ data class AppRow(
 )
 
 /**
+ * 详情页要用的打分（三件套 + JD 命中/缺失）
+ */
+data class ScoreRow(
+    val total: Int,
+    val strengths: String,
+    val gaps: String,
+    val advice: String,
+    val hit: String,
+    val miss: String,
+)
+
+/**
  * 本地台账。
  *
  * v2 变更（对齐 PRD §10）：
  *   · 新增 score / greeting / application / company 四张表
  *   · job 增加 dedupe_key（跨采集源去重）与 source（web / app）
  *   · 冲突时合并字段：网页来的行没有薪资，App 来的行补上
+ *
+ * v3 变更：新增 jd 表，缓存岗位详情正文（详情页展示 + 重新打分用）
  */
 class Db private constructor(ctx: Context) :
     SQLiteOpenHelper(ctx.applicationContext, DB_NAME, null, VERSION) {
 
     companion object {
         private const val DB_NAME = "jobpilot.db"
-        private const val VERSION = 2
+        private const val VERSION = 3
 
         @Volatile
         private var inst: Db? = null
@@ -67,6 +81,7 @@ class Db private constructor(ctx: Context) :
         db.execSQL("CREATE INDEX idx_job_time ON job(collected_at DESC)")
         db.execSQL("CREATE INDEX idx_job_company ON job(company)")
         createV2Tables(db)
+        createV3Tables(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -75,6 +90,19 @@ class Db private constructor(ctx: Context) :
             runCatching { db.execSQL("ALTER TABLE job ADD COLUMN source TEXT") }
             createV2Tables(db)
         }
+        if (oldVersion < 3) createV3Tables(db)
+    }
+
+    private fun createV3Tables(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS jd (
+              job_id      TEXT PRIMARY KEY,
+              text        TEXT,
+              fetched_at  INTEGER
+            )
+            """.trimIndent()
+        )
     }
 
     private fun createV2Tables(db: SQLiteDatabase) {
@@ -196,10 +224,12 @@ class Db private constructor(ctx: Context) :
     fun upsertJobs(jobs: List<Job>): Int {
         if (jobs.isEmpty()) return 0
         val db = writableDatabase
+        val black = blacklisted()
         var inserted = 0
         db.beginTransaction()
         try {
             for (j in jobs) {
+                if (j.company.isNotBlank() && Keys.normCompany(j.company) in black) continue
                 val key = Keys.dedupe(j.company, j.title)
                 val cv = ContentValues().apply {
                     put("id", j.id)
@@ -243,27 +273,28 @@ class Db private constructor(ctx: Context) :
 
     fun listJobs(onlySelected: Boolean = false): List<Job> {
         val where = if (onlySelected) "WHERE selected = 1" else ""
+        val black = blacklisted()
         val out = ArrayList<Job>()
         readableDatabase.rawQuery(
             "SELECT id,title,company,salary,area,tags,href,keyword,collected_at,selected,IFNULL(source,'') " +
                 "FROM job $where ORDER BY collected_at DESC, id", null
         ).use { c ->
             while (c.moveToNext()) {
-                out.add(
-                    Job(
-                        id = c.getString(0),
-                        title = c.getString(1),
-                        company = c.getString(2) ?: "",
-                        salary = c.getString(3) ?: "",
-                        area = c.getString(4) ?: "",
-                        tags = c.getString(5) ?: "",
-                        href = c.getString(6) ?: "",
-                        keyword = c.getString(7) ?: "",
-                        collectedAt = c.getLong(8),
-                        selected = c.getInt(9) == 1,
-                        source = c.getString(10) ?: "",
-                    )
+                val job = Job(
+                    id = c.getString(0),
+                    title = c.getString(1),
+                    company = c.getString(2) ?: "",
+                    salary = c.getString(3) ?: "",
+                    area = c.getString(4) ?: "",
+                    tags = c.getString(5) ?: "",
+                    href = c.getString(6) ?: "",
+                    keyword = c.getString(7) ?: "",
+                    collectedAt = c.getLong(8),
+                    selected = c.getInt(9) == 1,
+                    source = c.getString(10) ?: "",
                 )
+                if (black.isNotEmpty() && Keys.normCompany(job.company) in black) continue
+                out.add(job)
             }
         }
         return out
@@ -469,6 +500,64 @@ class Db private constructor(ctx: Context) :
             while (c.moveToNext()) m[c.getString(0)] = c.getInt(1)
         }
         return m
+    }
+
+    /** 详情页的一份完整打分（没有就 null） */
+    fun scoreRow(jobId: String): ScoreRow? =
+        readableDatabase.rawQuery(
+            """
+            SELECT total, IFNULL(strengths,''), IFNULL(gaps,''), IFNULL(advice,''),
+                   IFNULL(jd_hit,''), IFNULL(jd_miss,'')
+            FROM score WHERE job_id = ?
+            """.trimIndent(), arrayOf(jobId)
+        ).use { c ->
+            if (!c.moveToFirst()) null
+            else ScoreRow(
+                total = c.getInt(0),
+                strengths = c.getString(1),
+                gaps = c.getString(2),
+                advice = c.getString(3),
+                hit = c.getString(4),
+                miss = c.getString(5),
+            )
+        }
+
+    // ---------------------------------------------------------------- JD / 黑名单
+
+    /** 缓存岗位详情正文 */
+    fun saveJd(jobId: String, text: String) {
+        if (jobId.isBlank() || text.isBlank()) return
+        val cv = ContentValues().apply {
+            put("job_id", jobId)
+            put("text", text)
+            put("fetched_at", System.currentTimeMillis())
+        }
+        writableDatabase.insertWithOnConflict("jd", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun jobJd(jobId: String): String =
+        readableDatabase.rawQuery("SELECT text FROM jd WHERE job_id = ?", arrayOf(jobId)).use {
+            if (it.moveToFirst()) it.getString(0).orEmpty() else ""
+        }
+
+    /** 公司名归一化后的黑名单 */
+    fun blacklisted(): Set<String> {
+        val out = HashSet<String>()
+        readableDatabase.rawQuery("SELECT name_norm FROM company WHERE blacklisted = 1", null).use { c ->
+            while (c.moveToNext()) c.getString(0)?.let { out.add(it) }
+        }
+        return out
+    }
+
+    fun setBlacklisted(company: String, on: Boolean) {
+        if (company.isBlank()) return
+        val cv = ContentValues().apply {
+            put("name_norm", Keys.normCompany(company))
+            put("raw_names", company)
+            put("last_state", if (on) "blacklisted" else "")
+            put("blacklisted", if (on) 1 else 0)
+        }
+        writableDatabase.insertWithOnConflict("company", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
     /** 记一条投递台账。level: none / clicked / bound / delivered */

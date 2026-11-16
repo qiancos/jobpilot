@@ -71,6 +71,7 @@ object OneShot {
             Log.i(ctx, "oneshot", "失败：JD 太短")
             return R(false, jd = jd, error = "等了 ${jdWaited / 1000} 秒，JD 只有 ${jd.length} 字——请确认停在岗位详情页", stage = "读 JD")
         }
+        db.saveJd(job.id, jd)
 
         // 3. 核对页面上的公司名（防打错分）
         val pageText = StringBuilder()
