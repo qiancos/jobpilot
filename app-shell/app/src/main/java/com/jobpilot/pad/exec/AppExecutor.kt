@@ -22,6 +22,19 @@ object AppExecutor {
     private const val PKG = "com.hpbr.bosszhipin"
 
     data class Step(val name: String, val ok: Boolean, val detail: String = "")
+
+    /** 每走一步就回调一次，悬浮面板靠它实时刷新步骤流 */
+    @Volatile
+    var onStep: ((Step) -> Unit)? = null
+
+    /** 会通知监听器的步骤列表 */
+    private fun newStepList(): ArrayList<Step> = object : ArrayList<Step>() {
+        override fun add(element: Step): Boolean {
+            runCatching { onStep?.invoke(element) }
+            return super.add(element)
+        }
+    }
+
     data class Result(
         val ok: Boolean,
         val level: String,          // none / clicked / bound / delivered
@@ -32,7 +45,7 @@ object AppExecutor {
      * @param dryRun true = 只填进输入框并读回校验，不点发送
      */
     fun deliver(job: Job, text: String, dryRun: Boolean, waitBossMs: Long = 0): Result {
-        val steps = ArrayList<Step>()
+        val steps = newStepList()
         val svc = A11yBridge.service
             ?: return fail(steps, "无障碍", "服务未连接，无法操作 BOSS")
 
@@ -129,11 +142,18 @@ object AppExecutor {
         }
 
         // ---------- 5. 发送 ----------
-        val sendBtn = poll(3000) {
-            byText(rootOrNull(svc), "发送").firstOrNull { it.isClickable }
-                ?: byIdContains(rootOrNull(svc), "send").firstOrNull { it.isClickable }
-        } ?: return fail(steps, "找发送按钮", "没找到「发送」，话术还留在输入框里")
-        sendBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        val sendBtn = poll(4000) { findSend(rootOrNull(svc)) }
+        if (sendBtn == null) {
+            val diag = diagnoseBottom(rootOrNull(svc))
+            return fail(
+                steps, "找发送按钮",
+                "没找到「发送」，话术还留在输入框里。\n底部可点节点：" + diag
+            )
+        }
+        val clickedSend = sendBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        if (!clickedSend) {
+            return fail(steps, "点击发送", "按钮找到了但点不动（enabled=false？）")
+        }
         steps.add(Step("点击发送", true))
 
         // ---------- 6. 核验送达 ----------
@@ -199,6 +219,55 @@ object AppExecutor {
             }
         }
         return out
+    }
+
+    /** 找发送按钮：文本 / 无障碍描述 / 控件 id 三条路，命中后往上找可点的祖先 */
+    private fun findSend(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        val cands = ArrayList<AccessibilityNodeInfo>()
+        walk(root, 0) { n ->
+            val t = n.text?.toString()?.trim().orEmpty()
+            val d = runCatching { n.contentDescription?.toString() }.getOrNull().orEmpty()
+            val id = runCatching { n.viewIdResourceName }.getOrNull().orEmpty()
+            val hit = t == "发送" || t.equals("Send", true) ||
+                d.contains("发送") || id.contains("send", true)
+            if (hit) cands.add(n)
+        }
+        for (c in cands) clickableSelfOrAncestor(c)?.let { return it }
+        return null
+    }
+
+    private fun clickableSelfOrAncestor(n: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        var cur = n
+        var depth = 0
+        while (cur != null && depth < 6) {
+            if (cur.isClickable && cur.isEnabled) return cur
+            cur = runCatching { cur?.parent }.getOrNull()
+            depth++
+        }
+        return null
+    }
+
+    /** 找不到按钮时，把屏幕底部可点节点打出来，方便下次直接定位 */
+    private fun diagnoseBottom(root: AccessibilityNodeInfo?): String {
+        val screenH = runCatching {
+            A11yBridge.service?.resources?.displayMetrics?.heightPixels ?: 0
+        }.getOrDefault(0)
+        val sb = StringBuilder()
+        var n = 0
+        walk(root, 0) { node ->
+            if (node.isClickable && n < 8) {
+                val r = android.graphics.Rect()
+                node.getBoundsInScreen(r)
+                if (screenH > 0 && r.top > screenH * 2 / 3) {
+                    val t = node.text?.toString()?.take(12).orEmpty()
+                    val d = runCatching { node.contentDescription?.toString() }.getOrNull()?.take(12).orEmpty()
+                    val id = runCatching { node.viewIdResourceName }.getOrNull()?.substringAfterLast('/').orEmpty()
+                    sb.append("\n· id=$id t=$t d=$d @${r.centerX()},${r.centerY()}")
+                    n++
+                }
+            }
+        }
+        return if (sb.isEmpty()) "（底部没有可点节点）" else sb.toString()
     }
 
     private fun similar(a: String, b: String): Boolean {

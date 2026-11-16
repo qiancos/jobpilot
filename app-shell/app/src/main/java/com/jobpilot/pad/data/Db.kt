@@ -6,6 +6,16 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /**
+ * 最近一条投递的展示数据
+ */
+data class AppRow(
+    val company: String,
+    val title: String,
+    val state: String,
+    val at: Long,
+)
+
+/**
  * 本地台账。
  *
  * v2 变更（对齐 PRD §10）：
@@ -27,6 +37,10 @@ class Db private constructor(ctx: Context) :
             inst ?: synchronized(this) {
                 inst ?: Db(ctx).also { it.ensureDedupe() }
             }
+
+        /** 数据库文件大小（设置页展示用） */
+        fun fileBytes(ctx: Context): Long =
+            runCatching { ctx.getDatabasePath(DB_NAME).length() }.getOrDefault(0L)
     }
 
     // ---------------------------------------------------------------- 建表
@@ -287,11 +301,88 @@ class Db private constructor(ctx: Context) :
         ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
     }
 
+    /** 今日第一次采集的时间戳（没有就 0） */
+    fun firstCollectedToday(): Long =
+        readableDatabase.rawQuery(
+            "SELECT MIN(collected_at) FROM job WHERE collected_at >= ?",
+            arrayOf(todayStart().toString())
+        ).use { if (it.moveToFirst()) it.getLong(0) else 0L }
+
+    /** 今日发起过多少次（含失败） */
+    fun countAttemptsToday(): Int =
+        readableDatabase.rawQuery(
+            """
+            SELECT COUNT(*) FROM application
+            WHERE COALESCE(delivered_at, bound_at, clicked_at, plan_at) >= ?
+            """.trimIndent(), arrayOf(todayStart().toString())
+        ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+
+    /** 今日没送达的次数 */
+    fun countFailedToday(): Int =
+        readableDatabase.rawQuery(
+            """
+            SELECT COUNT(*) FROM application
+            WHERE state NOT IN ('delivered', 'verified')
+              AND COALESCE(delivered_at, bound_at, clicked_at, plan_at) >= ?
+            """.trimIndent(), arrayOf(todayStart().toString())
+        ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+
     fun clear() {
         writableDatabase.delete("job", null, null)
     }
 
+    /** 清空投递台账（application / company），岗位清单保留 */
+    fun clearLedger() {
+        writableDatabase.delete("application", null, null)
+        writableDatabase.delete("company", null, null)
+    }
+
+    /** 台账导出成 CSV 文本，设置页写到本机 Downloads 以外的私有目录 */
+    fun ledgerCsv(): String {
+        val sb = StringBuilder("公司,岗位,状态,点击时间,进会话时间,送达时间,失败原因\n")
+        readableDatabase.rawQuery(
+            """
+            SELECT a.company, j.title, a.state, a.clicked_at, a.bound_at, a.delivered_at, a.error_detail
+            FROM application a LEFT JOIN job j ON j.id = a.job_id
+            ORDER BY a.id DESC
+            """.trimIndent(), null
+        ).use { c ->
+            while (c.moveToNext()) {
+                val cells = (0..6).map { i ->
+                    c.getString(i).orEmpty().replace("\"", "\"\"").replace("\n", " ")
+                }
+                sb.append(cells.joinToString(",") { "\"$it\"" }).append('\n')
+            }
+        }
+        return sb.toString()
+    }
+
     // ---------------------------------------------------------------- 投递台账
+
+    /** 驾驶舱「最近投递」用的轻量行 */
+    fun recentApplications(limit: Int = 5): List<AppRow> {
+        val out = ArrayList<AppRow>()
+        readableDatabase.rawQuery(
+            """
+            SELECT a.company, j.title, a.state,
+                   COALESCE(a.delivered_at, a.bound_at, a.clicked_at, a.plan_at)
+            FROM application a LEFT JOIN job j ON j.id = a.job_id
+            ORDER BY a.id DESC LIMIT ?
+            """.trimIndent(), arrayOf(limit.toString())
+        ).use { c ->
+            while (c.moveToNext()) {
+                out.add(
+                    AppRow(
+                        company = c.getString(0).orEmpty(),
+                        title = c.getString(1).orEmpty(),
+                        state = c.getString(2).orEmpty(),
+                        at = c.getLong(3)
+                    )
+                )
+            }
+        }
+        return out
+    }
 
     fun countApplications(): Int =
         readableDatabase.rawQuery("SELECT COUNT(*) FROM application", null).use {
@@ -317,6 +408,67 @@ class Db private constructor(ctx: Context) :
             "SELECT COUNT(*) FROM application WHERE state = 'delivered' AND delivered_at >= ?",
             arrayOf(start.toString())
         ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+    }
+
+    private fun todayStart(): Long = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    /** 已送达的岗位 id 集合（清单里标「已投」用） */
+    fun deliveredJobIds(): Set<String> {
+        val out = HashSet<String>()
+        readableDatabase.rawQuery(
+            "SELECT DISTINCT job_id FROM application WHERE state IN ('delivered','verified')", null
+        ).use { c ->
+            while (c.moveToNext()) c.getString(0)?.let { out.add(it) }
+        }
+        return out
+    }
+
+    /** 这个岗位是否已经送达过 */
+    fun deliveredFor(jobId: String): Boolean =
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) FROM application WHERE job_id = ? AND state = 'delivered'",
+            arrayOf(jobId)
+        ).use { it.moveToFirst() && it.getInt(0) > 0 }
+
+    /** 这家公司今天是否已经投过（同公司当日只投一个岗） */
+    fun companyContactedToday(company: String): Boolean =
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) FROM application WHERE company_norm = ? AND state = 'delivered' AND delivered_at >= ?",
+            arrayOf(Keys.normCompany(company), todayStart().toString())
+        ).use { it.moveToFirst() && it.getInt(0) > 0 }
+
+    /** 最近一次送达的时间戳（0 = 从没投过） */
+    fun lastDeliveredAt(): Long =
+        readableDatabase.rawQuery(
+            "SELECT IFNULL(MAX(delivered_at), 0) FROM application WHERE state = 'delivered'", null
+        ).use { if (it.moveToFirst()) it.getLong(0) else 0L }
+
+    /** 存一条打分（覆盖旧的） */
+    fun saveScore(jobId: String, total: Int, hit: String, miss: String, strengths: String, gaps: String, advice: String) {
+        val cv = ContentValues().apply {
+            put("job_id", jobId)
+            put("total", total)
+            put("jd_hit", hit)
+            put("jd_miss", miss)
+            put("strengths", strengths)
+            put("gaps", gaps)
+            put("advice", advice)
+            put("model", "rule-v1")
+            put("created_at", System.currentTimeMillis())
+        }
+        writableDatabase.insertWithOnConflict("score", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    /** jobId -> 分数 */
+    fun scoreMap(): Map<String, Int> {
+        val m = HashMap<String, Int>()
+        readableDatabase.rawQuery("SELECT job_id, total FROM score", null).use { c ->
+            while (c.moveToNext()) m[c.getString(0)] = c.getInt(1)
+        }
+        return m
     }
 
     /** 记一条投递台账。level: none / clicked / bound / delivered */

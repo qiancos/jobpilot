@@ -44,6 +44,8 @@ android {
 }
 
 dependencies {
+    // PDF 文字提取（中文需要 ToUnicode CMap，手写抽不出来）
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")

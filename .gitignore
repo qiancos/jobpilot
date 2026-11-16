@@ -21,6 +21,8 @@ design/ref/
 
 # ---------- 本地个人信息（脱敏后不留库） ----------
 gate/facts.local.json
+app-shell/app/src/main/assets/resume.txt
+app-shell/app/src/main/assets/resume*.txt
 
 # ---------- 浏览器自动化缓存 ----------
 **/chrome-profile/

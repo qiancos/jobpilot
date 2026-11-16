@@ -36,10 +36,14 @@ class MainActivity : Activity() {
     private lateinit var a11yChip: TextView
     private var panel: FloatingPanel? = null
     private var awaitingOverlay = false
+    @Volatile private var scanning = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 设置页与面板共用这份配置（档位、日上限、条间隔、单批上限）
+        PanelState.load(this)
 
         // 打开 WebView 远程调试：PC 上 chrome://inspect 可直接看这个壳里的页面
         WebView.setWebContentsDebuggingEnabled(true)
@@ -352,10 +356,71 @@ class MainActivity : Activity() {
     private fun ensurePanel(): FloatingPanel =
         panel ?: FloatingPanel(this).also {
             it.onCollect = { collectFromApp() }
+            it.onScanList = { scanBossList() }
+            it.onStart = { startBatchFromPanel() }
+            it.onAbort = { com.jobpilot.pad.exec.BatchRunner.stop() }
             panel = it
         }
 
+    /**
+     * 面板上的「开始」：真正起批次。
+     * 清单取「已勾选」的岗位；没勾选就取全部，让 Safety 去拦不该投的。
+     */
+    private fun startBatchFromPanel() {
+        if (PanelState.phase == PanelState.Phase.PAUSED) {
+            PanelState.togglePause()
+            return
+        }
+        if (PanelState.phase == PanelState.Phase.RUNNING) return
+        if (com.jobpilot.pad.A11yBridge.service == null) {
+            PanelState.log("无障碍未连接，先去系统设置里打开 JobPilot 无障碍服务")
+            android.widget.Toast.makeText(this, "请先开启无障碍服务", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        val db = com.jobpilot.pad.data.Db.get(this)
+        val selected = db.listJobs(onlySelected = true)
+        val all = if (selected.isNotEmpty()) selected else db.listJobs()
+        val list = all.take(PanelState.batchCap)
+        if (list.isEmpty()) {
+            PanelState.log("清单是空的：先切到 BOSS 职位列表页点「采集」")
+            android.widget.Toast.makeText(this, "清单为空，先采集岗位", android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
+        PanelState.todayCount = runCatching { db.countDeliveredToday() }.getOrDefault(0)
+        PanelState.log("起批次：${list.size} 家（${if (selected.isNotEmpty()) "已勾选" else "全部"}）")
+        Thread {
+            runCatching {
+                com.jobpilot.pad.exec.BatchRunner.run(
+                    list, db,
+                    { job ->
+                        com.jobpilot.pad.exec.GreetingGen.build(
+                            job, com.jobpilot.pad.exec.ResumeProfile.load(this)
+                        )
+                    }
+                ) { /* 进度已由 BatchRunner 写进 PanelState */ }
+            }.onFailure { e ->
+                PanelState.log("批次异常中断：${e.message}")
+                PanelState.finishBatch()
+            }
+        }.start()
+    }
+
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    /** 面板上的「AI 扫列表」：BOSS 停在职位列表页时，逐个点进详情读 JD 打分 */
+    private fun scanBossList() {
+        if (scanning) return
+        scanning = true
+        PanelState.log("开始扫列表：逐个点进详情读 JD…")
+        Thread {
+            val db = com.jobpilot.pad.data.Db.get(this)
+            val ok = com.jobpilot.pad.exec.ListScanner.scanAndScore(this, db, 8) { p ->
+                PanelState.log("${p.index + 1}/${p.total} ${p.company}｜${p.phase}｜成功 ${p.ok} 失败 ${p.fail}")
+            }
+            PanelState.log("扫列表结束：成功 $ok 条")
+            scanning = false
+        }.start()
+    }
 
     private fun updateA11yChip() {
         if (!::a11yChip.isInitialized) return
