@@ -1,0 +1,44 @@
+# ---------- Android / Gradle ----------
+app-shell/.gradle/
+app-shell/build/
+app-shell/app/build/
+app-shell/local.properties
+*.apk
+*.aab
+*.dex
+*.class
+*.iml
+.idea/
+.cxx/
+captures/
+
+# ---------- 构建与打包产物 ----------
+dist/
+*.zip
+
+# ---------- 第三方参考资料（非本项目代码，不上传） ----------
+design/ref/
+
+# ---------- 本地个人信息（脱敏后不留库） ----------
+gate/facts.local.json
+
+# ---------- 浏览器自动化缓存 ----------
+**/chrome-profile/
+**/edge-profile/
+2026-11-16/tablet-feature-design/work/
+
+# ---------- 生成物与调试输出（含真实投递记录，不上传） ----------
+out/
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---------- 系统 / 编辑器 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.log

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>JobPilot · 流程图</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#303846;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+.canvas{width:1400px;height:860px;background:#F7F9FC;position:relative;overflow:hidden;
+        margin:0 auto 40px;border-radius:14px}
+body.only .canvas{display:none;margin:0;border-radius:0}
+body.only .canvas.on{display:block}
+h2{position:absolute;left:44px;top:32px;font-size:24px;color:#0F172A;letter-spacing:-.01em}
+.sub{position:absolute;left:44px;top:68px;font-size:13px;color:#64748B}
+.body{position:absolute;left:44px;right:44px;top:108px;bottom:32px}
+
+.box{background:#fff;border:1.5px solid #DDE4EF;border-radius:10px;padding:10px 12px;font-size:12.5px;
+     color:#0F172A;line-height:1.5}
+.box b{display:block;font-size:12.5px;font-weight:700;margin-bottom:2px}
+.box span{color:#64748B;font-size:11px}
+.box.green{border-color:#BBE6CC;background:#F4FBF6}
+.box.blue{border-color:#BFD6FA;background:#F4F8FF}
+.box.amber{border-color:#F5D9A8;background:#FFFBF2}
+.box.red{border-color:#F5C2C2;background:#FEF6F6}
+.box.dark{background:#0F172A;border-color:#0F172A;color:#fff}
+.box.dark span{color:#94A3B8}
+.arrow{color:#94A3B8;font-size:16px;display:flex;align-items:center;justify-content:center}
+.lane{display:grid;grid-template-columns:118px repeat(8,1fr);gap:10px;align-items:stretch;margin-bottom:12px}
+.lh{font-size:12px;font-weight:700;color:#475569;display:flex;align-items:center;justify-content:center;
+    background:#EEF2F8;border-radius:9px;padding:10px 6px;text-align:center;line-height:1.4}
+.colh{font-size:12px;font-weight:700;color:#2563EB;background:#EAF1FE;border-radius:9px;
+      display:flex;align-items:center;justify-content:center;padding:10px 4px}
+.cell{display:flex;flex-direction:column;gap:6px}
+.note{margin-top:18px;font-size:12px;color:#64748B;line-height:1.8;border-left:3px solid #22C55E;
+      padding-left:12px}
+/* 状态机 */
+.chain{display:flex;align-items:center;gap:0}
+.step{flex:1;text-align:center}
+.dia{width:44px;height:44px;border-radius:50%;background:#22C55E;color:#fff;font-weight:700;
+     display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:15px}
+.dia.gray{background:#CBD5E1;color:#475569}
+.dia.blue{background:#3B82F6}
+.step .t{font-size:12.5px;font-weight:700;color:#0F172A}
+.step .d{font-size:11px;color:#64748B;margin-top:3px;line-height:1.5}
+.line{height:2px;background:#E2E8F0;flex:0 0 28px;margin-top:-34px}
+/* 时序 */
+.seq{display:flex;flex-direction:column;gap:9px}
+.sr{display:flex;align-items:center;gap:12px}
+.si{width:26px;height:26px;border-radius:8px;background:#EEF2F8;color:#475569;font-size:11px;
+    font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.sr.act .si{background:#22C55E;color:#fff}
+.sr.gate .si{background:#F59E0B;color:#fff}
+.sr.fail .si{background:#DC2626;color:#fff}
+.st{font-size:12.5px;color:#0F172A}
+.st span{color:#64748B}
+.sr.gate{background:#FFFBF2;border:1px dashed #F5D9A8;border-radius:10px;padding:7px 10px;margin:0 -10px}
+.sr.fail{background:#FEF6F6;border:1px dashed #F5C2C2;border-radius:10px;padding:7px 10px;margin:0 -10px}
+/* 树 */
+.tree{display:flex;gap:26px;align-items:flex-start}
+.troot{min-width:150px}
+.tgroup{display:flex;flex-direction:column;gap:8px}
+.titem{font-size:11.5px;color:#334155;background:#fff;border:1px solid #E2E8F0;border-radius:8px;
+       padding:6px 10px;white-space:nowrap}
+.titem b{color:#2563EB;margin-right:5px}
+.tcol{display:flex;flex-direction:column;gap:8px}
+.tcol .th{font-size:11.5px;font-weight:700;color:#fff;background:#334155;border-radius:8px;padding:6px 10px;text-align:center}
+</style>
+</head>
+<body>
+
+<!-- 1 总流程泳道 -->
+<div class="canvas" id="f1">
+  <h2>一、主流程（谁在哪一步做什么）</h2>
+  <div class="sub">绿色=可推进 · 琥珀=要人看一眼 · 红色=不可逆</div>
+  <div class="body">
+    <div class="lane">
+      <div class="lh"></div>
+      <div class="colh">① 采集</div><div class="colh">② 筛选打分</div><div class="colh">③ 待投清单</div>
+      <div class="colh">④ 写话术</div><div class="colh">⑤ 确认</div><div class="colh">⑥ 执行</div>
+      <div class="colh">⑦ 核验</div><div class="colh">⑧ 跟进</div>
+    </div>
+    <div class="lane">
+      <div class="lh">你（人）</div>
+      <div class="box"><span>设条件</span></div>
+      <div class="box"><span>——</span></div>
+      <div class="box green"><b>勾选要投的</b><span>30 秒勾 8 个</span></div>
+      <div class="box green"><b>改 1–2 个字</b><span>过闸才进队列</span></div>
+      <div class="box amber"><b>按一次确认</b><span>不可跳过</span></div>
+      <div class="box"><span>看进度</span></div>
+      <div class="box"><span>看报告</span></div>
+      <div class="box green"><b>回 HR</b><span>发草稿</span></div>
+    </div>
+    <div class="lane">
+      <div class="lh">JobPilot</div>
+      <div class="box blue"><b>读控件树</b><span>滚动 5 屏</span></div>
+      <div class="box blue"><b>规则淘汰 + 打分</b><span>三件套</span></div>
+      <div class="box blue"><b>排序 / 去重</b><span>同公司当日 1 个</span></div>
+      <div class="box blue"><b>AI 起稿 + 9 条闸门</b><span>不过自动重写 2 轮</span></div>
+      <div class="box"><span>——</span></div>
+      <div class="box blue"><b>限速 + 熔断</b><span>45–120s</span></div>
+      <div class="box blue"><b>三态核验</b><span>指纹比对</span></div>
+      <div class="box blue"><b>台账 / 漏斗</b><span>可追溯</span></div>
+    </div>
+    <div class="lane">
+      <div class="lh">BOSS App</div>
+      <div class="box dark"><span>职位列表（只读）</span></div>
+      <div class="box"><span>——</span></div>
+      <div class="box"><span>——</span></div>
+      <div class="box"><span>——</span></div>
+      <div class="box"><span>——</span></div>
+      <div class="box dark"><b>被点击 / 被输入</b><span>立即沟通 + 发送</span></div>
+      <div class="box dark"><span>显示已发送消息</span></div>
+      <div class="box dark"><span>HR 回复</span></div>
+    </div>
+    <div class="note">
+      五个硬约束：① 采集只读不点 · ② 同公司当日只投一个岗 · ③ 话术不过闸不能进队列 ·
+      ④ 确认按钮不可跳过 · ⑤ 发送前必须核对公司名，不匹配就整条放弃
+    </div>
+  </div>
+</div>
+
+<!-- 2 自动筛选 6 步 -->
+<div class="canvas" id="f2">
+  <h2>二、自动筛选任务（6 步状态机）</h2>
+  <div class="sub">对应原型 19 屏 · 任一步收到验证请求，整条任务安全暂停</div>
+  <div class="body">
+    <div class="chain">
+      <div class="step"><div class="dia">1</div><div class="t">读取列表</div><div class="d">滚动加载<br>拿到 N 张卡</div></div>
+      <div class="line"></div>
+      <div class="step"><div class="dia">2</div><div class="t">初步筛选</div><div class="d">经验/学历/城市<br>硬冲突直接淘汰</div></div>
+      <div class="line"></div>
+      <div class="step"><div class="dia">3</div><div class="t">分析详情</div><div class="d">进详情读 JD<br>抓薪资与要求</div></div>
+      <div class="line"></div>
+      <div class="step"><div class="dia">4</div><div class="t">AI 评估</div><div class="d">打分 + 三件套<br>关键词命中/缺失</div></div>
+      <div class="line"></div>
+      <div class="step"><div class="dia">5</div><div class="t">生成话术</div><div class="d">起稿 → 闸门<br>不过重写 ≤2 轮</div></div>
+      <div class="line"></div>
+      <div class="step"><div class="dia gray">6</div><div class="t">完成</div><div class="d">进待投清单<br>不自动投</div></div>
+    </div>
+
+    <div style="margin-top:44px;display:flex;gap:20px">
+      <div class="box green" style="flex:1"><b>正常结束</b><span>筛到设定数量就停（默认 30），全部进待投清单，等你勾选</span></div>
+      <div class="box amber" style="flex:1"><b>验证中断</b><span>遇到滑块/人脸 → 立即暂停，进度与已筛结果全部保留，点「去 BOSS 处理」</span></div>
+      <div class="box red" style="flex:1"><b>连续 2 次验证</b><span>今日自动停止，冷却 24 小时，保护账号</span></div>
+    </div>
+
+    <div style="margin-top:36px">
+      <div style="font-size:12.5px;font-weight:700;color:#475569;margin-bottom:10px">状态流转</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155">
+        <span class="box" style="padding:6px 12px">待启动</span><span class="arrow">→</span>
+        <span class="box" style="padding:6px 12px">运行中</span><span class="arrow">→</span>
+        <span class="box amber" style="padding:6px 12px">已暂停</span><span class="arrow">↔</span>
+        <span class="box" style="padding:6px 12px">运行中</span><span class="arrow">→</span>
+        <span class="box green" style="padding:6px 12px">已完成</span>
+        <span class="arrow">/</span>
+        <span class="box red" style="padding:6px 12px">已中止</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3 投递执行时序 -->
+<div class="canvas" id="f3">
+  <h2>三、单条投递执行时序（三态核验）</h2>
+  <div class="sub">对应原型 08 / 09 屏 · 只有 L3 才算真的送到</div>
+  <div class="body" style="display:flex;gap:40px">
+    <div class="seq" style="flex:1.25">
+      <div class="sr"><div class="si">1</div><div class="st">取任务单 <span>{公司, 岗位, 话术, 指纹}</span></div></div>
+      <div class="sr"><div class="si">2</div><div class="st">校验 BOSS 在前台 <span>包名不符 → 中止</span></div></div>
+      <div class="sr"><div class="si">3</div><div class="st">查重 <span>同公司当日已投 → 跳过</span></div></div>
+      <div class="sr act"><div class="si">4</div><div class="st"><b>点击「立即沟通」</b> <span>→ L1 clicked</span></div></div>
+      <div class="sr"><div class="si">5</div><div class="st">等 1.5s，读会话页 <span>出现验证 → 熔断</span></div></div>
+      <div class="sr gate"><div class="si">6</div><div class="st"><b>安全阀：核对会话头部公司名</b> <span>相似度 &lt; 0.75 → 整条放弃</span></div></div>
+      <div class="sr act"><div class="si">7</div><div class="st"><b>会话绑定成功</b> <span>→ L2 bound</span></div></div>
+      <div class="sr"><div class="si">8</div><div class="st">检查 5 分钟内是否已发过 <span>已发 → 跳过，防重复</span></div></div>
+      <div class="sr act"><div class="si">9</div><div class="st"><b>输入话术 → 发送</b></div></div>
+      <div class="sr"><div class="si">10</div><div class="st">读最后一条自己消息 <span>含末 8 字指纹？</span></div></div>
+      <div class="sr act"><div class="si">11</div><div class="st"><b>命中 → L3 delivered</b> <span>记台账 + 留截图</span></div></div>
+      <div class="sr fail"><div class="si">✕</div><div class="st"><b>失败路径</b> <span>not_found / wrong_target / send_failed · 最多重试 2 次</span></div></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:14px">
+      <div class="box dark"><b>L1 · clicked</b><span>点击成功，但什么都还没发出去</span></div>
+      <div class="box blue"><b>L2 · bound</b><span>会话存在且公司名对得上——这一步是唯一不可挽回错误的守门人</span></div>
+      <div class="box green"><b>L3 · delivered</b><span>最后一条自己发的消息里能查到指纹，只有这级算送达</span></div>
+      <div class="box amber"><b>为什么要指纹</b><span>你踩过「以为发了其实没发」：按钮 disabled、草稿态、列表重排。<br>肉眼不可靠，只能比对文本。</span></div>
+      <div class="box red"><b>发错人 = 不可挽回</b><span>其余失败都能重试，只有发错人只能道歉。所以第 6 步宁可不发。</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 4 面板状态机 -->
+<div class="canvas" id="f4">
+  <h2>四、悬浮面板：按页面自动切视图</h2>
+  <div class="sub">对应原型 19–26 屏 · 顶部绿点是识别结果，tab 只是高亮，不是唯一入口</div>
+  <div class="body">
+    <div style="display:flex;align-items:center;gap:34px;margin-top:10px">
+      <div class="box dark" style="width:190px;text-align:center;padding:22px 12px">
+        <b>读到前台包名</b><span>com.hpbr.bosszhipin</span></div>
+      <div class="arrow">→</div>
+      <div class="box" style="width:170px;text-align:center;padding:22px 12px">
+        <b>识别页面类型</b><span>读不到 → 通用页</span></div>
+      <div class="arrow">→</div>
+      <div style="display:flex;flex-direction:column;gap:12px;flex:1">
+        <div style="display:flex;gap:12px;align-items:center">
+          <div class="box green" style="flex:1"><b>职位列表</b><span>tab → 筛选</span></div>
+          <div class="box" style="flex:1"><b>职位详情</b><span>tab → 诊断</span></div>
+          <div class="box" style="flex:1"><b>沟通页</b><span>tab → 回复</span></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <div class="box blue" style="flex:1"><b>网申表单</b><span>tab → 更多 / 网申</span></div>
+          <div class="box amber" style="flex:1"><b>安全验证</b><span>强制暂停态（26 屏）</span></div>
+          <div class="box" style="flex:1"><b>其它 App</b><span>只留采集 / 收起</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:56px;display:flex;gap:18px">
+      <div class="box" style="flex:1"><b>常驻 4 tab</b><span>筛选 / 待投 / 诊断 / 回复 —— 切页面只改高亮，用户不会丢上下文</span></div>
+      <div class="box" style="flex:1"><b>底部主操作随场景变</b><span>开始筛选 / 确认投递 / 使用打招呼语 / 填入输入框</span></div>
+      <div class="box" style="flex:1"><b>确认按钮永不自动点</b><span>面板只负责「准备」，发送永远由人触发</span></div>
+    </div>
+
+    <div class="note" style="margin-top:44px">
+      为什么不做成它那种「整块换视图」：UPCV 是浏览器扩展，关掉就没了；我们的面板一直浮在屏幕上，
+      换视图会让人瞬间找不到「刚才那条投到哪了」。常驻 tab + 自动高亮，是移动端更稳的做法。
+    </div>
+  </div>
+</div>
+
+<!-- 5 页面地图 -->
+<div class="canvas" id="f5">
+  <h2>五、26 屏信息架构</h2>
+  <div class="sub">1–13 主界面 · 14–18 面板演进 · 19–26 面板全量功能</div>
+  <div class="body">
+    <div class="tree">
+      <div class="tcol" style="width:180px">
+        <div class="th" style="background:#2563EB">主界面（1–13）</div>
+        <div class="titem"><b>01</b>首页 / 今日概览</div>
+        <div class="titem"><b>02</b>采集条件</div>
+        <div class="titem"><b>03</b>采集进行中</div>
+        <div class="titem"><b>04</b>待投清单</div>
+        <div class="titem"><b>05</b>岗位详情 + 三件套</div>
+        <div class="titem"><b>06</b>话术工作台</div>
+        <div class="titem"><b>07</b>批量确认</div>
+        <div class="titem"><b>08</b>执行中</div>
+        <div class="titem"><b>09</b>核验报告</div>
+        <div class="titem"><b>10</b>台账 / 漏斗</div>
+        <div class="titem"><b>11</b>会话管家</div>
+        <div class="titem"><b>12</b>网申代填</div>
+        <div class="titem"><b>13</b>设置</div>
+      </div>
+      <div class="tcol" style="width:210px">
+        <div class="th" style="background:#16A34A">悬浮面板（14–26）</div>
+        <div class="titem"><b>14</b>v1 基础面板</div>
+        <div class="titem"><b>15</b>v2 采集</div>
+        <div class="titem"><b>16</b>v2 投递</div>
+        <div class="titem"><b>17</b>v2 回复</div>
+        <div class="titem"><b>18</b>v2 三形态</div>
+        <div class="titem" style="border-color:#BBE6CC;background:#F4FBF6"><b>19</b>v3 自动筛选</div>
+        <div class="titem" style="border-color:#BBE6CC;background:#F4FBF6"><b>20</b>v3 筛选条件</div>
+        <div class="titem" style="border-color:#BBE6CC;background:#F4FBF6"><b>21</b>v3 待投列表</div>
+        <div class="titem" style="border-color:#BBE6CC;background:#F4FBF6"><b>22</b>v3 投递确认</div>
+        <div class="titem" style="border-color:#BBE6CC;background:#F4FBF6"><b>23</b>v3 职位诊断</div>
+        <div class="titem" style="border-color:#BBE6CC;background:#F4FBF6"><b>24</b>v3 回复</div>
+        <div class="titem" style="border-color:#BBE6CC;background:#F4FBF6"><b>25</b>v3 更多</div>
+        <div class="titem" style="border-color:#F5D9A8;background:#FFFBF2"><b>26</b>v3 验证中断</div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:14px;padding-left:10px">
+        <div class="box green"><b>M1 采集 + 清单</b><span>01 02 03 04 + 台账底表</span></div>
+        <div class="box green"><b>M2 执行 + 核验</b><span>08 09 + 面板 19 21 22 26</span></div>
+        <div class="box green"><b>M3 打分 + 话术</b><span>05 06 + 面板 23</span></div>
+        <div class="box green"><b>M4 会话 + 复盘</b><span>10 11 + 面板 24</span></div>
+        <div class="box green"><b>M5 网申 + 多版本</b><span>12 + 13 设置里的简历管理</span></div>
+        <div class="box"><b>贯穿</b><span>07 批量确认 · 面板 18 三形态 · 面板 20 条件 · 面板 25 更多</span></div>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:40px">
+      屏幕数量不是目标。26 屏里真正要写代码的是 <b style="color:#16A34A">19 / 20 / 21 / 22 / 23 / 24 / 26</b> 这 7 屏，
+      其余是已有或沿用。
+    </div>
+  </div>
+</div>
+
+<script>
+const p = new URLSearchParams(location.search);
+const only = p.get('only');
+if (only) {
+  document.body.classList.add('only');
+  const el = document.getElementById('f' + only);
+  if (el) el.classList.add('on');
+}
+</script>
+</body>
+</html>

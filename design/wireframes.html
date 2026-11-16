@@ -1,0 +1,1684 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>JobPilot 原型设计稿</title>
+<style>
+:root{
+  --bg:#F4F6FA; --card:#FFFFFF; --ink:#0F172A; --sub:#64748B; --faint:#94A3B8;
+  --line:#E5E9F0; --line2:#EEF1F6;
+  --green:#16A34A; --greenbg:#E8F7EE;
+  --blue:#2563EB; --bluebg:#E8F0FE;
+  --amber:#D97706; --amberbg:#FEF3E2;
+  --red:#DC2626; --redbg:#FDECEC;
+  --dark:#0F172A; --dark2:#1E293B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#303846;color:var(--ink)}
+
+/* 画板模式 */
+.board{padding:40px 48px 80px}
+.board h1{color:#fff;font-size:26px;margin-bottom:6px}
+.board .lead{color:#A7B3C6;font-size:13px;margin-bottom:36px;line-height:1.9}
+.grid{display:flex;flex-wrap:wrap;gap:48px}
+.wrap{display:flex;flex-direction:column;gap:12px}
+.cap{color:#C9D4E5;font-size:13px;display:flex;gap:10px;align-items:baseline}
+.cap b{color:#fff;font-size:14px}
+.cap span{color:#8B98AC;font-size:12px}
+
+/* 单个屏幕 */
+.screen{width:1280px;height:854px;background:var(--bg);border-radius:18px;overflow:hidden;
+        display:flex;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+body.only .screen{display:none}
+body.only .screen.on{display:flex}
+
+/* 左侧导航 */
+.rail{width:78px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;
+      align-items:center;padding:18px 0;gap:6px;flex:none}
+.logo{width:38px;height:38px;border-radius:11px;background:var(--dark);color:#fff;display:flex;
+      align-items:center;justify-content:center;font-weight:700;font-size:13px;margin-bottom:14px}
+.navi{width:52px;height:52px;border-radius:12px;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:3px;color:var(--faint);font-size:10px}
+.navi i{font-style:normal;font-size:16px;line-height:1}
+.navi.on{background:var(--greenbg);color:var(--green)}
+.rail .sp{flex:1}
+
+/* 主区 */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:64px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;
+        padding:0 24px;gap:16px;flex:none}
+.topbar h2{font-size:17px;font-weight:650}
+.topbar .sub{color:var(--faint);font-size:12px}
+.topbar .right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.content{flex:1;padding:20px 24px;overflow:hidden}
+
+/* 通用 */
+.row{display:flex;gap:16px}
+.col{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.card h3{font-size:13px;font-weight:650;color:var(--sub);letter-spacing:.02em;margin-bottom:12px}
+.muted{color:var(--sub)}
+.tiny{font-size:11px;color:var(--faint)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 18px;
+     border-radius:10px;font-size:13px;font-weight:600;background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.ghost{background:#fff}
+.btn.sm{height:30px;padding:0 12px;font-size:12px;border-radius:8px}
+.pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;
+      font-size:11px;font-weight:600;background:#F1F4F9;color:var(--sub)}
+.pill.g{background:var(--greenbg);color:var(--green)}
+.pill.b{background:var(--bluebg);color:var(--blue)}
+.pill.a{background:var(--amberbg);color:var(--amber)}
+.pill.r{background:var(--redbg);color:var(--red)}
+.divider{height:1px;background:var(--line2);margin:12px 0}
+.num{font-variant-numeric:tabular-nums}
+
+/* 首页 */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi .lab{font-size:12px;color:var(--sub)}
+.kpi .val{font-size:30px;font-weight:700;margin-top:6px;letter-spacing:-.02em}
+.kpi .val small{font-size:13px;font-weight:500;color:var(--faint);margin-left:4px}
+.kpi .delta{font-size:11px;margin-top:6px}
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl{display:flex;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line2)}
+.tl:last-child{border:0}
+.tl .dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-top:6px;flex:none}
+.tl .dot.b{background:var(--blue)} .tl .dot.a{background:var(--amber)} .tl .dot.gray{background:var(--faint)}
+.tl .t{font-size:12px;color:var(--faint);width:44px;flex:none}
+.tl .x{font-size:13px;line-height:1.5}
+
+/* 采集条件 */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{height:30px;padding:0 14px;border-radius:8px;background:#F1F4F9;color:var(--ink);
+      font-size:12.5px;display:inline-flex;align-items:center;font-weight:500}
+.chip.on{background:var(--greenbg);color:var(--green);font-weight:600;outline:1.5px solid #BBE6CC}
+.field{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line2)}
+.field .k{width:96px;font-size:12.5px;color:var(--sub);flex:none}
+.range{height:6px;background:#EDF0F6;border-radius:99px;flex:1;position:relative}
+.range i{position:absolute;left:26%;right:34%;top:0;bottom:0;background:var(--green);border-radius:99px}
+.range b{position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;
+         border:3px solid var(--green);top:-5px}
+
+/* 列表 */
+.list{display:flex;flex-direction:column}
+.item{display:flex;align-items:center;gap:14px;padding:12px 8px;border-bottom:1px solid var(--line2)}
+.item .cb{width:18px;height:18px;border-radius:5px;border:1.5px solid #CDD5E1;flex:none}
+.item .cb.on{background:var(--green);border-color:var(--green);position:relative}
+.item .cb.on:after{content:"";position:absolute;left:5px;top:2px;width:5px;height:9px;
+                   border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
+.item .body{flex:1;min-width:0}
+.item .ttl{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .meta{font-size:12px;color:var(--sub);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .tags{display:flex;gap:6px;margin-top:7px}
+.score{width:58px;height:58px;border-radius:12px;display:flex;flex-direction:column;align-items:center;
+       justify-content:center;flex:none;background:var(--greenbg);color:var(--green);overflow:hidden}
+.score.mid{background:var(--amberbg);color:var(--amber)}
+.score.low{background:#F1F4F9;color:var(--faint)}
+.score b{font-size:20px;line-height:1}
+.score b:after{content:"分";font-size:9px;margin-left:1px;opacity:.7}
+.score span{display:none}
+
+/* 详情 */
+.jd{font-size:12.5px;line-height:1.85;color:#334155}
+.jd h4{font-size:12px;color:var(--sub);margin:14px 0 6px}
+.kw{display:inline-block;padding:1px 5px;border-radius:4px;font-size:11.5px;margin:0 2px}
+.kw.hit{background:var(--greenbg);color:var(--green);font-weight:600}
+.kw.miss{background:#FDECEC;color:var(--red);text-decoration:line-through}
+.three{display:flex;flex-direction:column;gap:12px}
+.blk{border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.7}
+.blk.good{background:var(--greenbg)} .blk.bad{background:var(--redbg)} .blk.tip{background:var(--bluebg)}
+.blk b{display:block;font-size:11.5px;margin-bottom:5px;letter-spacing:.03em}
+.blk.good b{color:var(--green)} .blk.bad b{color:var(--red)} .blk.tip b{color:var(--blue)}
+
+/* 话术 */
+.draft{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+.draft .txt{font-size:15px;line-height:1.9;letter-spacing:.01em}
+.draft .txt em{font-style:normal;background:#FFF3CD;border-radius:3px;padding:0 2px}
+.gate{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.gr{display:flex;align-items:center;gap:7px;font-size:11.5px;background:#F8FAFD;border-radius:8px;padding:7px 9px}
+.gr i{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.gr.warn i{background:var(--amber)} .gr.bad i{background:var(--red)}
+.gr span{color:var(--sub);margin-left:auto;font-size:10.5px}
+
+/* 进度 */
+.bar{height:8px;background:#E9EDF4;border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--green);border-radius:99px}
+.log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.95;color:#475569}
+.log b{color:var(--green);font-weight:600} .log em{color:var(--red);font-style:normal}
+
+/* 漏斗 */
+.funnel{display:flex;flex-direction:column;gap:9px}
+.fn{display:flex;align-items:center;gap:12px}
+.fn .lab{width:64px;font-size:12px;color:var(--sub);text-align:right;flex:none}
+.fn .track{flex:1;height:30px;background:#F1F4F9;border-radius:8px;overflow:hidden;position:relative}
+.fn .track i{display:block;height:100%;background:linear-gradient(90deg,#22C55E,#16A34A);border-radius:8px}
+.fn .track span{position:absolute;right:10px;top:6px;font-size:12px;font-weight:600;color:#fff}
+.fn .rate{width:52px;font-size:12px;color:var(--faint);text-align:right}
+
+/* 聊天 */
+.conv{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:12px}
+.conv.on{background:var(--greenbg)}
+.avatar{width:38px;height:38px;border-radius:50%;background:#DDE4EF;flex:none;display:flex;
+        align-items:center;justify-content:center;font-size:12px;color:var(--sub);font-weight:600}
+.bubble{max-width:66%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.7;margin-bottom:10px}
+.bubble.them{background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
+.bubble.me{background:var(--green);color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+.ai-card{border:1.5px dashed #BBE6CC;background:#F6FCF8;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.8}
+
+/* 表单 */
+.f{margin-bottom:14px}
+.f label{display:block;font-size:11.5px;color:var(--sub);margin-bottom:5px}
+.f .in{height:36px;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;
+      padding:0 12px;font-size:12.5px;background:#fff}
+.f .in.ok{border-color:#BBE6CC;background:#F7FCF9}
+.f .in.miss{border-color:#F5C2C2;background:#FEF7F7;color:#B91C1C}
+
+/* 悬浮面板 */
+.bossbg{position:absolute;inset:0;background:#EFF3F8;padding:0}
+.boss-hd{height:56px;background:linear-gradient(90deg,#0B1B2B,#12324A);display:flex;align-items:center;padding:0 22px;color:#7FD3C4;font-size:15px;font-weight:700}
+.boss-list{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.boss-card{height:96px;background:#fff;border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.skel{height:11px;border-radius:5px;background:#E8EDF4}
+.panel{position:absolute;left:96px;top:120px;width:360px;background:#0F172A;border-radius:16px;padding:14px;
+       box-shadow:0 24px 60px rgba(0,0,0,.45)}
+.panel .ph{display:flex;align-items:center;gap:8px;color:#fff;font-size:13.5px;font-weight:650;margin-bottom:12px}
+.panel .ph .st{color:#94A3B8;font-size:11px;margin-left:6px}
+.panel .ph .x{margin-left:auto;color:#94A3B8;font-size:14px}
+.plab{color:#64748B;font-size:10.5px;margin:9px 0 5px}
+.ptier{display:flex;gap:6px}
+.ptier div{flex:1;height:32px;border-radius:8px;background:rgba(255,255,255,.08);color:#94A3B8;
+           display:flex;align-items:center;justify-content:center;font-size:12px}
+.ptier div.on{background:#22C55E;color:#fff;font-weight:600}
+.pval{color:#22C55E;font-size:12px;margin-bottom:4px}
+.pbtns{display:flex;gap:6px;margin-top:12px}
+.pbtns div{flex:1;height:40px;border-radius:10px;background:#22C55E;color:#fff;display:flex;
+           align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.pbtns div.gray{background:rgba(255,255,255,.1);color:#CBD5E1}
+.plog{margin-top:12px;background:rgba(0,0,0,.28);border-radius:8px;padding:8px 10px;font-family:ui-monospace,monospace;
+      font-size:10.5px;line-height:1.9;color:#CBD5E1;height:126px;overflow:hidden}
+.handle{position:absolute;right:10px;bottom:10px;width:0;height:0;
+        border-left:13px solid transparent;border-bottom:13px solid #64748B;opacity:.75}
+
+/* ============ 悬浮面板 v2（对齐 UPCV 插件的信息架构） ============ */
+.p2{position:absolute;right:26px;top:34px;width:392px;background:#0B1220;border-radius:18px;
+    padding:12px;border:1px solid rgba(255,255,255,.07);
+    box-shadow:0 26px 70px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:9px;overflow:hidden;clip-path:inset(0 round 18px)}
+.p2 .hd{display:flex;align-items:center;gap:8px;color:#fff;font-size:13.5px;font-weight:650;padding:2px 2px 0}
+.p2 .hd .st{display:flex;align-items:center;gap:5px;color:#94A3B8;font-size:10.5px;margin-left:6px;font-weight:400}
+.p2 .hd .st i{width:6px;height:6px;border-radius:50%;background:#22C55E;display:block}
+.p2 .hd .ic{margin-left:auto;display:flex;gap:12px;color:#7C8AA0;font-size:13px}
+.p2 .ctx{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#86EFAC;
+         background:rgba(34,197,94,.1);border-radius:9px;padding:7px 10px;margin-top:2px}
+.p2 .ctx i{width:6px;height:6px;border-radius:50%;background:#22C55E;display:block;flex:none}
+.p2 .ctx span{margin-left:auto;color:#4ADE80;font-size:10px}
+.p2 .tabs{display:flex;gap:4px;background:rgba(255,255,255,.05);padding:4px;border-radius:11px;overflow:hidden}
+.p2 .tabs div{flex:1;min-width:0;height:30px;border-radius:8px;color:#8A99AE;font-size:12px;
+              display:flex;align-items:center;justify-content:center;gap:4px}
+.p2 .tabs div.on{background:#22C55E;color:#fff;font-weight:650}
+.p2 .tabs div b{font-size:9px;background:rgba(255,255,255,.22);border-radius:6px;padding:1px 4px;font-weight:600}
+.c2{background:rgba(255,255,255,.04);border-radius:12px;padding:12px}
+.c2 .rt{display:flex;align-items:center;gap:8px;font-size:12px;color:#E2E8F0}
+.p2 .lab{color:#64748B;font-size:10.5px;margin:2px 0 6px}
+.cond{display:flex;flex-wrap:wrap;gap:5px}
+.cond div{font-size:11px;color:#CBD5E1;background:rgba(255,255,255,.07);border-radius:7px;padding:4px 8px}
+.big{height:42px;border-radius:11px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:650;
+     display:flex;align-items:center;justify-content:center;gap:6px}
+.big.g{background:#22C55E}
+.big.ghost{background:rgba(255,255,255,.08);color:#CBD5E1;font-weight:500}
+.tiles{display:flex;gap:8px}
+.tiles .t{flex:1;background:rgba(255,255,255,.05);border-radius:11px;padding:10px 12px;text-align:center}
+.tiles .t b{display:block;color:#fff;font-size:24px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.tiles .t span{color:#7C8AA0;font-size:10.5px}
+.drl{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border-radius:10px;
+     padding:10px 12px;color:#CBD5E1;font-size:12px}
+.drl b{margin-left:auto;color:#fff;font-variant-numeric:tabular-nums}
+.drl .ch{color:#64748B}
+.p2 .sel{display:flex;align-items:center;font-size:11px;color:#8A99AE}
+.p2 .sel b{color:#fff;font-size:12px;font-weight:600}
+.p2 .sel .r{margin-left:auto;display:flex;gap:12px;color:#5B9BFF}
+.jc{background:rgba(255,255,255,.05);border-radius:11px;padding:10px 11px;display:flex;gap:9px}
+.jc.on{outline:1px solid rgba(34,197,94,.5);background:rgba(34,197,94,.07)}
+.jc .ck{width:15px;height:15px;border-radius:4px;border:1.4px solid #475569;flex:none;margin-top:2px}
+.jc.on .ck{background:#22C55E;border-color:#22C55E;position:relative}
+.jc.on .ck:after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;
+                 border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
+.jc .b{flex:1;min-width:0}
+.jc .n{font-size:12.5px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jc .m{font-size:10.5px;color:#7C8AA0;margin-top:2px}
+.jc .g{margin-top:7px;font-size:10.5px;color:#A7B3C6;background:rgba(0,0,0,.28);border-radius:7px;
+        padding:6px 8px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;
+        -webkit-box-orient:vertical;overflow:hidden}
+.p2 .hd .mark{width:10px;height:10px;position:relative;margin-right:3px;flex:none}
+.p2 .hd .mark:before{content:"";position:absolute;left:0;top:1px;width:10px;height:1.6px;
+  background:#7C8AA0;border-radius:2px;box-shadow:0 3.6px 0 #7C8AA0,0 7.2px 0 #7C8AA0}
+.spill{margin-left:auto;font-size:9.5px;background:rgba(34,197,94,.16);color:#4ADE80;
+       border-radius:6px;padding:2px 6px;font-weight:600;flex:none;align-self:flex-start}
+.spill.warn{background:rgba(245,158,11,.16);color:#FBBF24}
+.quota{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#CBD5E1;
+       background:rgba(37,99,235,.14);border-radius:10px;padding:9px 11px}
+.quota b{color:#fff}
+.quota span{margin-left:auto;color:#8A99AE;font-size:10.5px}
+.tgl{display:flex;align-items:center;gap:9px;font-size:11.5px;color:#CBD5E1;padding:2px 2px}
+.tgl .sw{width:34px;height:19px;border-radius:99px;background:#22C55E;margin-left:auto;position:relative}
+.tgl .sw:after{content:"";position:absolute;right:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff}
+.tgl .sw.off{background:#334155}
+.tgl .sw.off:after{left:2px;right:auto}
+.f2{display:flex;gap:8px}
+.f2 .big{flex:1}
+.f2 .dang{background:rgba(239,68,68,.13);color:#F87171;font-weight:600}
+.hint{font-size:10.5px;color:#4ADE80;padding:0 2px}
+.hint.gray{color:#64748B}
+.crow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#CBD5E1;padding:7px 2px}
+.crow i{width:14px;text-align:center;color:#7C8AA0;font-style:normal}
+.crow b{margin-left:auto;color:#fff;font-weight:600}
+.ta{background:rgba(0,0,0,.3);border-radius:9px;padding:9px 10px;font-size:11.5px;line-height:1.75;
+    color:#DCE4F0;height:74px;overflow:hidden}
+.mini3{display:flex;gap:6px}
+.mini3 .big{height:34px;font-size:11px;border-radius:9px;padding:0 2px}
+
+/* 贴边把手 / 小球 */
+.grip{position:absolute;right:0;top:280px;width:26px;height:96px;background:#0B1220;
+      border-radius:14px 0 0 14px;box-shadow:-8px 0 24px rgba(0,0,0,.35);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+      color:#94A3B8;font-size:10px;border:1px solid rgba(255,255,255,.07);border-right:0}
+.grip b{color:#22C55E;font-size:13px}
+.ball{position:absolute;right:36px;top:300px;width:60px;height:60px;border-radius:50%;
+      background:#0B1220;border:1px solid rgba(255,255,255,.1);box-shadow:0 10px 30px rgba(0,0,0,.45);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+.ball b{font-size:13px;font-weight:700;line-height:1.1}
+.ball span{font-size:8.5px;color:#94A3B8}
+.ball .badge{position:absolute;right:-2px;top:-2px;width:17px;height:17px;border-radius:50%;
+             background:#EF4444;color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center}
+/* ============ 面板 v3（覆盖 UPCV 插件全量功能） ============ */
+.p3{position:absolute;right:24px;top:20px;width:404px;max-height:812px;background:#0B1220;border-radius:18px;
+    border:1px solid rgba(255,255,255,.07);box-shadow:0 26px 70px rgba(0,0,0,.55);
+    display:flex;flex-direction:column;overflow:hidden}
+.p3 .hd{display:flex;align-items:center;gap:7px;color:#fff;font-size:13px;font-weight:650;
+        padding:12px 12px 8px;flex:none}
+.p3 .hd .mark{width:10px;height:10px;position:relative;margin-right:2px;flex:none}
+.p3 .hd .mark:before{content:"";position:absolute;left:0;top:1px;width:10px;height:1.6px;background:#7C8AA0;
+  border-radius:2px;box-shadow:0 3.6px 0 #7C8AA0,0 7.2px 0 #7C8AA0}
+.p3 .hd .ic{margin-left:auto;display:flex;gap:11px;color:#7C8AA0;font-size:12.5px}
+.p3 .rec{display:flex;align-items:center;gap:6px;font-size:11px;color:#86EFAC;
+         background:rgba(34,197,94,.1);border-radius:8px;padding:6px 9px;margin:0 12px 8px;flex:none}
+.p3 .rec i{width:5px;height:5px;border-radius:50%;background:#22C55E;flex:none}
+.p3 .rec span{margin-left:auto;color:#4ADE80;font-size:9.5px}
+.p3 .seg{display:flex;margin:0 12px 9px;background:rgba(255,255,255,.05);border-radius:10px;padding:3px;flex:none}
+.p3 .seg div{flex:1;height:27px;border-radius:7px;color:#8A99AE;font-size:11.5px;
+             display:flex;align-items:center;justify-content:center;gap:3px}
+.p3 .seg div.on{background:#22C55E;color:#fff;font-weight:650}
+.p3 .seg i{font-style:normal;font-size:9px;background:rgba(255,255,255,.2);border-radius:5px;padding:0 4px}
+.p3 .body{flex:1;overflow:hidden;padding:0 12px;display:flex;flex-direction:column;gap:8px}
+.p3 .foot{padding:9px 12px 11px;border-top:1px solid rgba(255,255,255,.07);flex:none}
+.p3 .foot .note{font-size:9.5px;color:#64748B;text-align:center;margin-top:5px}
+.bx{background:rgba(255,255,255,.045);border-radius:11px;padding:11px}
+.bx .h{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#E2E8F0;font-weight:600}
+.bx .h .tag{margin-left:auto;font-size:9px;padding:2px 6px;border-radius:5px;
+            background:rgba(34,197,94,.16);color:#4ADE80;font-weight:600}
+.bx .h .tag.blue{background:rgba(59,130,246,.18);color:#93C5FD}
+.bx .h .tag.gray{background:rgba(255,255,255,.08);color:#94A3B8}
+.steps{display:flex;gap:3px;margin:9px 0 6px}
+.steps div{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.1)}
+.steps div.done{background:#22C55E}.steps div.now{background:#3B82F6}
+.slab{display:flex;justify-content:space-between;font-size:9px;color:#64748B}
+.slab b{color:#93C5FD;font-weight:600}
+.two{display:flex;gap:8px}
+.two .n{flex:1;background:rgba(255,255,255,.05);border-radius:10px;padding:9px;text-align:center}
+.two .n b{display:block;font-size:22px;color:#fff;font-weight:700;line-height:1.25}
+.two .n span{font-size:9.5px;color:#7C8AA0}
+.cur{display:flex;align-items:center;gap:7px;font-size:10.5px;color:#A7B3C6;
+     background:rgba(0,0,0,.25);border-radius:8px;padding:7px 9px}
+.cur em{font-style:normal;color:#CBD5E1}
+.row3{display:flex;gap:6px}
+.row3 .m{flex:1;height:34px;border-radius:8px;background:rgba(255,255,255,.08);color:#CBD5E1;
+         font-size:11px;display:flex;align-items:center;justify-content:center;gap:4px}
+.row3 .m.red{background:rgba(239,68,68,.13);color:#F87171;font-weight:600}
+.dr{display:flex;align-items:center;gap:7px;font-size:11px;color:#CBD5E1;
+    background:rgba(255,255,255,.04);border-radius:9px;padding:9px 10px}
+.dr b{margin-left:auto;color:#fff}
+.dr .a{color:#64748B}
+.jrow{display:flex;gap:8px;background:rgba(255,255,255,.05);border-radius:10px;padding:9px 10px}
+.jrow .ck{width:14px;height:14px;border-radius:4px;border:1.4px solid #475569;flex:none;margin-top:2px}
+.jrow.on .ck{background:#22C55E;border-color:#22C55E;position:relative}
+.jrow.on .ck:after{content:"";position:absolute;left:3.5px;top:0;width:4px;height:7px;
+  border:2px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
+.jrow .i{flex:1;min-width:0}
+.jrow .t{font-size:11.5px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jrow .s{font-size:9.5px;color:#7C8AA0;margin-top:2px}
+.jrow .p{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.sc{font-size:10px;font-weight:700;color:#4ADE80;background:rgba(34,197,94,.14);
+    border-radius:5px;padding:1px 5px}
+.sc.mid{color:#FBBF24;background:rgba(245,158,11,.14)}
+.st{font-size:8.5px;color:#64748B}
+.chp{display:flex;flex-wrap:wrap;gap:5px}
+.chp div{font-size:10.5px;color:#CBD5E1;background:rgba(255,255,255,.07);border-radius:6px;padding:4px 8px}
+.chp div.on{background:rgba(34,197,94,.18);color:#4ADE80;font-weight:600}
+.kv{display:flex;align-items:center;font-size:10.5px;color:#8A99AE;padding:5px 0}
+.kv b{margin-left:auto;color:#E2E8F0;font-weight:500}
+.ring{width:56px;height:56px;border-radius:50%;flex:none;
+      background:conic-gradient(#22C55E 0 86%,rgba(255,255,255,.1) 86% 100%);
+      display:flex;align-items:center;justify-content:center}
+.ring div{width:44px;height:44px;border-radius:50%;background:#0B1220;display:flex;
+          flex-direction:column;align-items:center;justify-content:center}
+.ring b{font-size:15px;color:#fff;line-height:1}
+.ring span{font-size:7.5px;color:#64748B;margin-top:1px}
+.lst{font-size:10px;line-height:1.7;color:#A7B3C6}
+.lst b{color:#4ADE80;display:block;font-size:10px;margin-bottom:3px}
+.lst.bad b{color:#F87171}.lst.tip b{color:#93C5FD}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#0F172A;border-radius:16px 16px 0 0;
+       padding:12px;border-top:1px solid rgba(255,255,255,.1);box-shadow:0 -18px 40px rgba(0,0,0,.5)}
+.mask{position:absolute;inset:0;background:rgba(4,8,16,.62)}
+</style>
+</head>
+<body>
+
+<div class="board" id="board">
+  <h1>JobPilot · 前端原型 v1</h1>
+  <p class="lead">
+    目标设备：vivo PA2573 · 2064×3096 · 横屏使用 · 设计基准 1280×854（3:2）<br>
+    设计原则：内容轻、字密度高、深色只用于悬浮面板；红色只留给「危险 / 失败」，绿色只表示「可推进」。
+  </p>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- ============ 1 首页 ============ -->
+<div class="screen" id="s1">
+  <div class="rail">
+    <div class="logo">JP</div>
+    <div class="navi on"><i>◎</i>首页</div>
+    <div class="navi"><i>☰</i>清单</div>
+    <div class="navi"><i>✎</i>话术</div>
+    <div class="navi"><i>▤</i>台账</div>
+    <div class="sp"></div>
+    <div class="navi"><i>⚙</i>设置</div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <h2>今天</h2><span class="sub">2026-11-16 · 周日</span>
+      <div class="right">
+        <div class="pill g">无障碍 已就绪</div>
+        <div class="btn primary">开始采集</div>
+      </div>
+    </div>
+    <div class="content col">
+      <div class="kpis">
+        <div class="kpi"><div class="lab">今日采集</div><div class="val num">42<small>个岗位</small></div><div class="delta muted">去重后 38 · 新公司 31</div></div>
+        <div class="kpi"><div class="lab">待你审</div><div class="val num" style="color:#2563EB">17<small>条</small></div><div class="delta muted">其中 9 条匹配度 ≥ 75</div></div>
+        <div class="kpi"><div class="lab">今天已投</div><div class="val num" style="color:#16A34A">8<small>/ 15</small></div><div class="delta" style="color:#16A34A">8/8 送达已核验</div></div>
+        <div class="kpi"><div class="lab">本周回复</div><div class="val num">3<small>条</small></div><div class="delta" style="color:#D97706">1 条待回 · 1 条约面</div></div>
+      </div>
+      <div class="row" style="flex:1;min-height:0">
+        <div class="card" style="flex:1.35">
+          <h3>接着做</h3>
+          <div class="timeline">
+            <div class="tl"><div class="dot a"></div><div class="t">下一步</div><div class="x"><b>审 17 条候选</b> · 预计 8 分钟<br><span class="tiny">其中「文云文化」「亿达信息」与你的项目高度相关</span></div><div style="margin-left:auto"><div class="btn primary sm">去审阅</div></div></div>
+            <div class="tl"><div class="dot b"></div><div class="t">14:02</div><div class="x">采集完成 · 42 个岗位（Java 后端 / 广州）</div></div>
+            <div class="tl"><div class="dot"></div><div class="t">13:40</div><div class="x">「法本信息」HR 回复：方便发一份简历吗？<div style="margin-top:8px"><span class="pill b">已生成回复草稿</span></div></div></div>
+            <div class="tl"><div class="dot gray"></div><div class="t">昨天</div><div class="x">批量投递 8 家 · 8 送达 · 0 失败</div></div>
+          </div>
+        </div>
+        <div class="card" style="flex:1">
+          <h3>今日安全线</h3>
+          <div class="row" style="align-items:center;gap:20px">
+            <div style="width:104px;height:104px;border-radius:50%;background:conic-gradient(#16A34A 0 53%,#EDF0F6 53% 100%);display:flex;align-items:center;justify-content:center">
+              <div style="width:78px;height:78px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                <div style="font-size:20px;font-weight:700">8</div><div class="tiny">已用 / 15</div>
+              </div>
+            </div>
+            <div class="col" style="gap:8px;flex:1">
+              <div class="tiny">当前档位：<b style="color:#0F172A">标准（15 条/日）</b></div>
+              <div class="tiny">条间隔：45–120 秒</div>
+              <div class="tiny">距下次可投：约 4 分钟</div>
+              <div class="pill g" style="align-self:flex-start;margin-top:4px">无异常</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 2 采集条件 ============ -->
+<div class="screen" id="s2">
+  <div class="rail">
+    <div class="logo">JP</div>
+    <div class="navi on"><i>◎</i>首页</div><div class="navi"><i>☰</i>清单</div>
+    <div class="navi"><i>✎</i>话术</div><div class="navi"><i>▤</i>台账</div>
+    <div class="sp"></div><div class="navi"><i>⚙</i>设置</div>
+  </div>
+  <div class="main">
+    <div class="topbar"><h2>采集条件</h2><span class="sub">上次用：Java 后端 · 广州</span>
+      <div class="right"><div class="btn ghost">存为模板</div><div class="btn primary">开始采集 →</div></div>
+    </div>
+    <div class="content row">
+      <div class="card" style="flex:1.5">
+        <h3>关键词</h3>
+        <div class="chips">
+          <div class="chip on">Java</div><div class="chip on">后端开发</div><div class="chip on">Java 实习</div>
+          <div class="chip">全栈</div><div class="chip">Spring Boot</div><div class="chip">AI 应用</div>
+          <div class="chip">产品助理</div><div class="chip" style="color:#94A3B8">＋ 添加</div>
+        </div>
+        <div class="divider"></div>
+        <h3>城市与薪资</h3>
+        <div class="field"><div class="k">城市</div><div class="chips"><div class="chip on">广州</div><div class="chip on">深圳</div><div class="chip">佛山</div></div></div>
+        <div class="field"><div class="k">薪资</div><div class="range"><i></i><b style="left:24%"></b><b style="left:62%"></b></div>
+          <div style="width:96px;font-size:12.5px;text-align:right" class="num">6–12K</div></div>
+        <div class="field"><div class="k">经验</div><div class="chips"><div class="chip on">在校/应届</div><div class="chip on">经验不限</div><div class="chip">1-3 年</div></div></div>
+        <div class="field" style="border:0"><div class="k">排除</div><div class="chips">
+          <div class="chip on">外包/驻场</div><div class="chip on">培训机构</div><div class="chip on">销售/客服</div>
+          <div class="chip on">已投过的公司</div><div class="chip" style="color:#94A3B8">＋ 添加</div></div></div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card">
+          <h3>预计产出</h3>
+          <div class="row" style="align-items:baseline;gap:6px"><div style="font-size:30px;font-weight:700" class="num">30–50</div><div class="tiny">个岗位</div></div>
+          <div class="tiny" style="margin-top:10px;line-height:1.8">
+            3 个关键词 × 2 个城市，去重后约 38 个<br>
+            采集耗时约 90 秒，只读不投
+          </div>
+        </div>
+        <div class="card">
+          <h3>注意</h3>
+          <div class="tiny" style="line-height:1.9">
+            · 采集时 BOSS App 需要在前台<br>
+            · 滚动 5 屏后停止，避免触发风控<br>
+            · 未登录时最多只能看到约 15 条
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 3 采集进行中 ============ -->
+<div class="screen" id="s3">
+  <div class="main" style="width:100%">
+    <div class="topbar"><h2>正在采集</h2><span class="sub">Java · 广州 / 深圳</span>
+      <div class="right"><div class="btn ghost">暂停</div><div class="btn ghost" style="color:#DC2626;border-color:#F5C2C2">停止</div></div></div>
+    <div class="content row">
+      <div class="card" style="flex:1.2;display:flex;flex-direction:column">
+        <h3>进度</h3>
+        <div class="row" style="align-items:baseline;gap:8px;margin:6px 0 14px">
+          <div style="font-size:44px;font-weight:700" class="num">23</div><div class="muted">/ 约 38 个岗位</div>
+        </div>
+        <div class="bar"><i style="width:61%"></i></div>
+        <div class="row" style="margin-top:14px;gap:10px;flex-wrap:wrap">
+          <div class="pill g">已滚动 3 / 5 屏</div><div class="pill">去重命中 7 条</div><div class="pill a">当前：第 4 屏加载中</div>
+        </div>
+        <div class="divider"></div>
+        <h3>刚采到</h3>
+        <div class="list">
+          <div class="item" style="border-color:#EEF1F6"><div class="body"><div class="ttl">Java developer-双休 外企项目</div>
+            <div class="meta">法本 · 广州·海珠区·琶洲 · 3-5年</div></div><div class="pill">新</div></div>
+          <div class="item" style="border-color:#EEF1F6"><div class="body"><div class="ttl">Java 开发工程师</div>
+            <div class="meta">亿达信息 · 广州·天河区·体育中心 · 3-5年</div></div><div class="pill">新</div></div>
+          <div class="item" style="border:0"><div class="body"><div class="ttl">Java 后端开发（27 届）</div>
+            <div class="meta">文云文化 · 广州·天河·棠下 · 应届</div></div><div class="pill">新</div></div>
+        </div>
+      </div>
+      <div class="card" style="flex:1">
+        <h3>实时日志</h3>
+        <div class="log">
+          <div><b>●</b> 09:41:02 采集启动（BOSS 在前台）</div>
+          <div>09:41:03 滚到第 1 屏 · 读到 9 张卡</div>
+          <div>09:41:06 滚到第 2 屏 · 读到 9 张卡</div>
+          <div>09:41:09 滚到第 3 屏 · 读到 8 张卡</div>
+          <div>09:41:12 去重：7 条已存在，跳过</div>
+          <div>09:41:15 滚到第 4 屏 · 加载中…</div>
+          <div class="muted">— 只读，不点击任何按钮 —</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 4 待投清单 ============ -->
+<div class="screen" id="s4">
+  <div class="rail">
+    <div class="logo">JP</div>
+    <div class="navi"><i>◎</i>首页</div><div class="navi on"><i>☰</i>清单</div>
+    <div class="navi"><i>✎</i>话术</div><div class="navi"><i>▤</i>台账</div>
+    <div class="sp"></div><div class="navi"><i>⚙</i>设置</div>
+  </div>
+  <div class="main">
+    <div class="topbar"><h2>待投清单</h2><span class="sub">38 条 · 已选 6</span>
+      <div class="right">
+        <div class="chip">今日活跃</div><div class="chip on">匹配 ≥ 75</div><div class="chip">排除已投</div>
+        <div style="width:1px;height:24px;background:#E5E9F0;margin:0 6px"></div>
+        <div class="btn primary">生成话术（6）</div>
+      </div>
+    </div>
+    <div class="content" style="padding-top:12px">
+      <div class="list">
+        <div class="item"><div class="cb on"></div>
+          <div class="body"><div class="ttl">Java 后端开发（27 届校招）</div>
+            <div class="meta">文云文化 · 广州·天河·棠下 · 8-13K · 应届</div>
+            <div class="tags"><span class="pill g">今日活跃</span><span class="pill">27 届</span><span class="pill">本科</span><span class="pill b">Spring Boot 命中</span></div></div>
+          <div class="score"><b>86</b><span>匹配</span></div></div>
+        <div class="item"><div class="cb on"></div>
+          <div class="body"><div class="ttl">Java 开发工程师</div>
+            <div class="meta">亿达信息 · 广州·天河区·体育中心 · 6-9K · 1-3年</div>
+            <div class="tags"><span class="pill g">今日活跃</span><span class="pill">本科</span><span class="pill b">MyBatis 命中</span></div></div>
+          <div class="score"><b>81</b><span>匹配</span></div></div>
+        <div class="item"><div class="cb on"></div>
+          <div class="body"><div class="ttl">AI 应用开发实习生</div>
+            <div class="meta">文云文化 · 广州·天河·棠下 · 150-300/天 · 在校</div>
+            <div class="tags"><span class="pill g">刚刚活跃</span><span class="pill">27 届</span><span class="pill b">RAG 命中</span></div></div>
+          <div class="score"><b>79</b><span>匹配</span></div></div>
+        <div class="item"><div class="cb on"></div>
+          <div class="body"><div class="ttl">Java developer-双休 外企项目</div>
+            <div class="meta">法本 · 广州·海珠区·琶洲 · 面议 · 3-5年</div>
+            <div class="tags"><span class="pill g">今日活跃</span><span class="pill a">经验偏高</span><span class="pill b">Spring 命中</span></div></div>
+          <div class="score mid"><b>72</b><span>匹配</span></div></div>
+        <div class="item"><div class="cb"></div>
+          <div class="body"><div class="ttl">全栈工程师（可转正）</div>
+            <div class="meta">析微智能 · 深圳·南山·科技园 · 200-400/天 · 硕士</div>
+            <div class="tags"><span class="pill">本周活跃</span><span class="pill r">学历不符</span><span class="pill b">Vue 命中</span></div></div>
+          <div class="score mid"><b>64</b><span>匹配</span></div></div>
+        <div class="item"><div class="cb"></div>
+          <div class="body"><div class="ttl">Java 开发（金融方向）</div>
+            <div class="meta">深德科 · 广州·海珠区·琶洲 · 4-5K · 3-5年</div>
+            <div class="tags"><span class="pill a">薪资偏低</span><span class="pill a">经验偏高</span></div></div>
+          <div class="score low"><b>48</b><span>匹配</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 5 岗位详情 + 三件套 ============ -->
+<div class="screen" id="s5">
+  <div class="main" style="width:100%">
+    <div class="topbar"><h2>Java 后端开发（27 届校招）</h2><span class="sub">文云文化 · 广州·天河·棠下</span>
+      <div class="right"><div class="pill g">匹配 86</div><div class="btn ghost">不投</div><div class="btn primary">写话术 →</div></div></div>
+    <div class="content row">
+      <div class="card" style="flex:1.25;overflow:hidden">
+        <div class="row" style="align-items:baseline;gap:10px;margin-bottom:4px">
+          <div style="font-size:20px;font-weight:700" class="num" >8-13K</div>
+          <div class="pill">应届 · 本科</div><div class="pill">20-99 人</div><div class="pill g">今日活跃</div>
+        </div>
+        <div class="divider"></div>
+        <div class="jd">
+          <h4>职位描述</h4>
+          参与公司核心业务系统的后端开发与迭代，负责接口设计与实现。<br><br>
+          <h4>任职要求</h4>
+          · 熟悉 <span class="kw hit">Java</span> 基础，了解 JVM 内存模型<br>
+          · 用过 <span class="kw hit">Spring Boot</span> / <span class="kw hit">MyBatis-Plus</span><br>
+          · 熟悉 <span class="kw hit">MySQL</span>，能写复杂 SQL 与索引优化<br>
+          · 了解 <span class="kw hit">Redis</span> 缓存使用场景<br>
+          · 熟悉 <span class="kw miss">Kafka</span> 消息队列者优先<br>
+          · 了解 <span class="kw miss">微服务治理</span>（注册中心/链路追踪）<br>
+          · 2027 届本科，可实习 3 个月以上
+        </div>
+        <div class="divider"></div>
+        <div class="row" style="justify-content:space-between">
+          <div class="tiny">HR：方女士 · 招聘经理 · 今日回复 10+ 次</div>
+          <div class="tiny">异地招聘 · 岗位实际在佛山南海</div>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card">
+          <h3>为什么是 86 分</h3>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <span class="pill g">硬性 40/40</span><span class="pill g">技能 22/25</span>
+            <span class="pill b">可对证 14/20</span><span class="pill">公司 6/10</span><span class="pill">时效 5/5</span>
+          </div>
+          <div class="divider"></div>
+          <div class="three">
+            <div class="blk good"><b>优势</b>
+              JD 要求 Spring/MyBatis + MySQL，你两段实习正好做过电商商城的商品/订单/支付模块，对得上。<br>
+              27 届本科，卡在条件上。</div>
+            <div class="blk bad"><b>不足</b>
+              没写过 Kafka；「微服务治理」只有 SpringCloud 的课程级了解。</div>
+            <div class="blk tip"><b>建议</b>
+              话术里不要提 Kafka。重点说「接口设计 + 索引优化 + 独立排查线上问题」这三件你真有的事。</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>JD 关键词对齐</h3>
+          <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">
+            <span class="pill g">Java</span><span class="pill g">Spring Boot</span><span class="pill g">MyBatis-Plus</span>
+            <span class="pill g">MySQL</span><span class="pill g">Redis</span><span class="pill g">索引优化</span>
+          </div>
+          <div class="tiny" style="margin-bottom:6px">缺失（生成话术时会禁止出现）</div>
+          <div class="row" style="gap:6px"><span class="pill r">Kafka</span><span class="pill r">微服务治理</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 6 话术工作台 ============ -->
+<div class="screen" id="s6">
+  <div class="rail">
+    <div class="logo">JP</div>
+    <div class="navi"><i>◎</i>首页</div><div class="navi"><i>☰</i>清单</div>
+    <div class="navi on"><i>✎</i>话术</div><div class="navi"><i>▤</i>台账</div>
+    <div class="sp"></div><div class="navi"><i>⚙</i>设置</div>
+  </div>
+  <div class="main">
+    <div class="topbar"><h2>话术工作台</h2><span class="sub">第 3 / 6 条 · 已通过 5</span>
+      <div class="right"><div class="pill g">闸门 9/9 通过</div><div class="btn ghost">重新生成</div><div class="btn primary">下一条 →</div></div></div>
+    <div class="content row">
+      <div class="col" style="flex:1.45">
+        <div class="draft">
+          <div class="row" style="margin-bottom:10px"><div class="pill b">版本 A · 技术证据型</div>
+            <div class="pill" style="margin-left:auto">视觉宽度 82</div></div>
+          <div class="txt">看到岗位要 <em>Spring / MyBatis + MySQL</em> 基础，我实习时用 Spring Boot + MyBatis-Plus 做过电商商城的商品、订单和支付模块，也给 MySQL 做过索引优化；Redis 缓存热点数据那块是我写的。可每周 5 天、稳定 3 个月以上，方便发您一份简历吗？</div>
+          <div class="divider"></div>
+          <div class="row" style="gap:8px"><div class="btn ghost sm">改一句</div><div class="btn ghost sm">换开头</div>
+            <div class="btn ghost sm">看版本 B</div><div style="margin-left:auto" class="tiny">引用 JD：「Spring / MyBatis + MySQL」</div></div>
+        </div>
+        <div class="card">
+          <h3>闸门校验</h3>
+          <div class="gate">
+            <div class="gr"><i></i>R1 长度 55–95<span>82</span></div>
+            <div class="gr"><i></i>R2 开场非模板<span>✓</span></div>
+            <div class="gr"><i></i>R3 引用 JD<span>✓</span></div>
+            <div class="gr"><i></i>R4 数字证据<span>3 处</span></div>
+            <div class="gr"><i></i>R5 到岗时间<span>✓</span></div>
+            <div class="gr"><i></i>R6 技术栈 4 类<span>4</span></div>
+            <div class="gr"><i></i>R7 不雷同<span>0.31</span></div>
+            <div class="gr"><i></i>R8 事实一致<span>✓</span></div>
+            <div class="gr warn"><i></i>R9 结尾有话口<span>可优化</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card">
+          <h3>本批 6 条</h3>
+          <div class="list">
+            <div class="item" style="padding:9px 4px"><div class="body"><div class="ttl" style="font-size:13px">文云文化 · Java 后端</div>
+              <div class="meta">宽度 82 · 9/9 通过</div></div><div class="pill g">可发</div></div>
+            <div class="item" style="padding:9px 4px"><div class="body"><div class="ttl" style="font-size:13px">亿达信息 · Java 开发</div>
+              <div class="meta">宽度 76 · 9/9 通过</div></div><div class="pill g">可发</div></div>
+            <div class="item" style="padding:9px 4px;background:#F6FCF8;border-radius:10px"><div class="body"><div class="ttl" style="font-size:13px">文云文化 · AI 实习</div>
+              <div class="meta">当前正在编辑</div></div><div class="pill b">编辑中</div></div>
+            <div class="item" style="padding:9px 4px"><div class="body"><div class="ttl" style="font-size:13px">法本 · Java developer</div>
+              <div class="meta">宽度 96 · R1 超长</div></div><div class="pill a">待改</div></div>
+            <div class="item" style="padding:9px 4px"><div class="body"><div class="ttl" style="font-size:13px">析微智能 · 全栈</div>
+              <div class="meta">学历不符，建议跳过</div></div><div class="pill r">不建议</div></div>
+            <div class="item" style="padding:9px 4px;border:0"><div class="body"><div class="ttl" style="font-size:13px">深德科 · Java 金融</div>
+              <div class="meta">宽度 71 · 9/9 通过</div></div><div class="pill g">可发</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>批量</h3>
+          <div class="row"><div class="btn primary" style="flex:1">全部过闸的进队列（5）</div></div>
+          <div class="tiny" style="margin-top:8px">不会直接发送，还要你确认一次</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 7 批量确认 ============ -->
+<div class="screen" id="s7">
+  <div class="main" style="width:100%">
+    <div class="topbar"><h2>确认发送</h2><span class="sub">这批 5 家 · 预计 6 分钟</span>
+      <div class="right"><div class="btn ghost">返回改</div><div class="btn primary">确认发送 5 家</div></div></div>
+    <div class="content row">
+      <div class="card" style="flex:1.5">
+        <h3>将发送的内容</h3>
+        <div class="list">
+          <div class="item"><div class="avatar">文</div><div class="body">
+            <div class="ttl">文云文化 · Java 后端开发（27 届校招）</div>
+            <div class="meta" style="color:#334155;white-space:normal;line-height:1.75;margin-top:6px">
+              看到岗位要 Spring / MyBatis + MySQL 基础，我实习时用 Spring Boot + MyBatis-Plus 做过电商商城的商品、订单和支付模块…</div>
+          </div><div class="pill g">已过闸</div></div>
+          <div class="item"><div class="avatar">亿</div><div class="body">
+            <div class="ttl">亿达信息 · Java 开发工程师</div>
+            <div class="meta" style="color:#334155;white-space:normal;line-height:1.75;margin-top:6px">
+              你们这个岗做接口开发和联调，我在某某网络做过内容后台的文章发布、权限和定时统计，接口文档和联调都是我自己跟的…</div>
+          </div><div class="pill g">已过闸</div></div>
+          <div class="item"><div class="avatar">文</div><div class="body">
+            <div class="ttl">文云文化 · AI 应用开发实习生</div>
+            <div class="meta" style="color:#334155;white-space:normal;line-height:1.75;margin-top:6px">
+              看到岗位做 AI 应用落地，我用 LangGraph 搭过四阶段工作流，也用 RAG 做过电商客服（解决率 85%）…</div>
+          </div><div class="pill g">已过闸</div></div>
+          <div class="item"><div class="avatar">法</div><div class="body">
+            <div class="ttl">法本 · Java developer-双休</div>
+            <div class="meta" style="color:#334155;white-space:normal;line-height:1.75;margin-top:6px">
+              外企项目这块我做过类似的接口对接，Spring Boot + MyBatis-Plus 是日常，可每周 5 天…</div>
+          </div><div class="pill g">已过闸</div></div>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card">
+          <h3>发送前自检</h3>
+          <div class="col" style="gap:10px">
+            <div class="row" style="align-items:center"><span class="pill g">✓</span><div style="font-size:13px">4 条话术全部通过闸门</div></div>
+            <div class="row" style="align-items:center"><span class="pill g">✓</span><div style="font-size:13px">没有已投过的公司</div></div>
+            <div class="row" style="align-items:center"><span class="pill g">✓</span><div style="font-size:13px">今天还有 7 条额度</div></div>
+            <div class="row" style="align-items:center"><span class="pill a">!</span><div style="font-size:13px">「法本」要求 3-5 年，你只有实习</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>节奏</h3>
+          <div class="field" style="border:0;padding:6px 0"><div class="k" style="width:70px">档位</div>
+            <div class="row" style="gap:6px;flex:1"><div class="chip on">标准</div><div class="chip">保守</div><div class="chip">激进</div></div></div>
+          <div class="tiny" style="margin-top:6px">5 家 · 条间隔 45–120 秒 · 预计 6 分钟</div>
+        </div>
+        <div class="card" style="background:#FFFBF3;border-color:#F5E3C0">
+          <h3 style="color:#B45309">这一步之后不能撤回</h3>
+          <div class="tiny" style="line-height:1.9;color:#7C5B22">
+            消息发出去 HR 就会看到。发错人比不发更糟——所以每一条都会在发送前核对公司名。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 8 执行中 ============ -->
+<div class="screen" id="s8">
+  <div class="main" style="width:100%">
+    <div class="topbar"><h2>正在发送</h2><span class="sub">3 / 5 · 已送达 3</span>
+      <div class="right"><div class="pill g">BOSS 在前台</div><div class="btn ghost">暂停</div></div></div>
+    <div class="content row">
+      <div class="card" style="flex:1.2">
+        <div class="bar"><i style="width:60%"></i></div>
+        <div class="row" style="margin-top:14px;align-items:center;gap:16px">
+          <div class="avatar" style="width:46px;height:46px;font-size:14px">文</div>
+          <div><div style="font-size:15px;font-weight:650">文云文化 · AI 应用开发实习生</div>
+            <div class="tiny" style="margin-top:4px">正在输入话术…</div></div>
+          <div class="pill b" style="margin-left:auto">进行中</div>
+        </div>
+        <div class="divider"></div>
+        <h3>本批进度</h3>
+        <div class="list">
+          <div class="item" style="padding:9px 4px"><div class="pill g">✓</div><div class="body"><div class="ttl" style="font-size:13px">亿达信息 · Java 开发工程师</div>
+            <div class="meta">12:04:03 送达 · 指纹校验通过</div></div></div>
+          <div class="item" style="padding:9px 4px"><div class="pill g">✓</div><div class="body"><div class="ttl" style="font-size:13px">法本 · Java developer</div>
+            <div class="meta">12:05:41 送达 · 指纹校验通过</div></div></div>
+          <div class="item" style="padding:9px 4px"><div class="pill g">✓</div><div class="body"><div class="ttl" style="font-size:13px">深德科 · Java 金融</div>
+            <div class="meta">12:07:22 送达 · 指纹校验通过</div></div></div>
+          <div class="item" style="padding:9px 4px;background:#F6FCF8;border-radius:10px"><div class="pill b">…</div><div class="body">
+            <div class="ttl" style="font-size:13px">文云文化 · AI 应用开发实习生</div><div class="meta">正在输入</div></div></div>
+          <div class="item" style="padding:9px 4px;border:0"><div class="pill">·</div><div class="body">
+            <div class="ttl" style="font-size:13px">文云文化 · Java 后端开发</div><div class="meta" style="color:#94A3B8">等待中</div></div></div>
+        </div>
+      </div>
+      <div class="card" style="flex:1">
+        <h3>执行日志</h3>
+        <div class="log">
+          <div><b>12:03:58</b> 开始本批（5 家）</div>
+          <div><b>12:04:03</b> 亿达信息 → 点击「立即沟通」</div>
+          <div><b>12:04:05</b> 会话已绑定 · 公司名校验 ✓</div>
+          <div><b>12:04:06</b> 已发送 · 指纹命中 → <b>L3 送达</b></div>
+          <div>12:04:51 等待 45s…</div>
+          <div><b>12:05:41</b> 法本 · 送达 → L3</div>
+          <div><b>12:07:22</b> 深德科 · 送达 → L3</div>
+          <div><b>12:08:10</b> 文云文化（AI 实习）→ 输入中</div>
+          <div class="muted">— 熔断监控：正常 —</div>
+        </div>
+        <div class="divider"></div>
+        <div class="row" style="gap:8px"><span class="pill g">验证码 0</span><span class="pill g">异常文案 0</span><span class="pill g">发错人 0</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 9 核验报告 ============ -->
+<div class="screen" id="s9">
+  <div class="main" style="width:100%">
+    <div class="topbar"><h2>本批完成</h2><span class="sub">12:08 · 用时 4 分 12 秒</span>
+      <div class="right"><div class="btn ghost">导出</div><div class="btn primary">看台账</div></div></div>
+    <div class="content row">
+      <div class="col" style="flex:1.4">
+        <div class="card">
+          <div class="row" style="gap:24px;align-items:center">
+            <div><div class="tiny">送达</div><div style="font-size:34px;font-weight:700;color:#16A34A" class="num">4<small style="font-size:14px;color:#94A3B8"> / 5</small></div></div>
+            <div><div class="tiny">失败</div><div style="font-size:34px;font-weight:700;color:#DC2626" class="num">1</div></div>
+            <div><div class="tiny">平均间隔</div><div style="font-size:34px;font-weight:700" class="num">63<small style="font-size:14px;color:#94A3B8">秒</small></div></div>
+            <div style="margin-left:auto" class="pill g">L3 核验通过率 80%</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>逐条结果</h3>
+          <div class="list">
+            <div class="item"><div class="pill g">L3</div><div class="body"><div class="ttl">文云文化 · AI 应用开发实习生</div>
+              <div class="meta">12:08:14 送达 · 指纹「解决率 85%」命中</div></div><div class="tiny">截图</div></div>
+            <div class="item"><div class="pill g">L3</div><div class="body"><div class="ttl">亿达信息 · Java 开发工程师</div>
+              <div class="meta">12:04:06 送达 · 指纹「接口文档」命中</div></div><div class="tiny">截图</div></div>
+            <div class="item"><div class="pill g">L3</div><div class="body"><div class="ttl">法本 · Java developer</div>
+              <div class="meta">12:05:41 送达</div></div><div class="tiny">截图</div></div>
+            <div class="item"><div class="pill g">L3</div><div class="body"><div class="ttl">深德科 · Java 金融</div>
+              <div class="meta">12:07:22 送达</div></div><div class="tiny">截图</div></div>
+            <div class="item" style="border:0;background:#FEF7F7;border-radius:10px">
+              <div class="pill r">L2</div><div class="body"><div class="ttl">文云文化 · Java 后端开发</div>
+              <div class="meta" style="color:#B91C1C">会话未找到 · 已跳过，未发送（不会重试，避免重复）</div></div>
+              <div class="tiny">截图</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card">
+          <h3>为什么有 1 条失败</h3>
+          <div class="tiny" style="line-height:1.9">
+            同一家公司今天已经投过另一个岗位，会话列表里没有独立的新会话。<br><br>
+            <b>这是设计好的行为</b>：同一公司当日只投一个岗。宁可漏投，也不重复骚扰。
+          </div>
+        </div>
+        <div class="card">
+          <h3>下一步</h3>
+          <div class="col" style="gap:10px">
+            <div class="row" style="align-items:center"><span class="pill b">1</span><div style="font-size:13px">明天 09:00 自动看回复</div></div>
+            <div class="row" style="align-items:center"><span class="pill b">2</span><div style="font-size:13px">今天还剩 7 条额度</div></div>
+            <div class="row" style="align-items:center"><span class="pill b">3</span><div style="font-size:13px">「法本」被拒概率高，已标灰</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 10 台账 / 漏斗 ============ -->
+<div class="screen" id="s10">
+  <div class="rail">
+    <div class="logo">JP</div>
+    <div class="navi"><i>◎</i>首页</div><div class="navi"><i>☰</i>清单</div>
+    <div class="navi"><i>✎</i>话术</div><div class="navi on"><i>▤</i>台账</div>
+    <div class="sp"></div><div class="navi"><i>⚙</i>设置</div>
+  </div>
+  <div class="main">
+    <div class="topbar"><h2>台账</h2><span class="sub">近 30 天 · 78 条投递</span>
+      <div class="right"><div class="chip on">全部</div><div class="chip">已回复</div><div class="chip">待跟进</div>
+        <div class="btn ghost">导出 xlsx</div></div></div>
+    <div class="content row">
+      <div class="card" style="flex:1">
+        <h3>漏斗</h3>
+        <div class="funnel">
+          <div class="fn"><div class="lab">候选</div><div class="track"><i style="width:100%"></i><span>312</span></div><div class="rate">—</div></div>
+          <div class="fn"><div class="lab">审批</div><div class="track"><i style="width:64%"></i><span>198</span></div><div class="rate">63%</div></div>
+          <div class="fn"><div class="lab">送达</div><div class="track"><i style="width:25%"></i><span>78</span></div><div class="rate">39%</div></div>
+          <div class="fn"><div class="lab">已读</div><div class="track"><i style="width:18%;background:linear-gradient(90deg,#60A5FA,#2563EB)"></i><span>56</span></div><div class="rate">72%</div></div>
+          <div class="fn"><div class="lab">回复</div><div class="track"><i style="width:7%;background:linear-gradient(90deg,#FBBF24,#D97706)"></i><span>21</span></div><div class="rate">38%</div></div>
+          <div class="fn"><div class="lab">约面</div><div class="track"><i style="width:3%;background:linear-gradient(90deg,#F87171,#DC2626)"></i><span>9</span></div><div class="rate">43%</div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="row" style="gap:20px">
+          <div><div class="tiny">送达→回复</div><div style="font-size:20px;font-weight:700;color:#D97706">27%</div></div>
+          <div><div class="tiny">回复→约面</div><div style="font-size:20px;font-weight:700;color:#DC2626">43%</div></div>
+          <div><div class="tiny">平均首回时长</div><div style="font-size:20px;font-weight:700">2.4 天</div></div>
+        </div>
+      </div>
+      <div class="col" style="flex:1.15">
+        <div class="card">
+          <h3>话术版本对比</h3>
+          <div class="list">
+            <div class="item" style="padding:8px 4px"><div class="pill g">A 技术证据型</div>
+              <div class="body"><div class="meta">发 46 条 · 回复 15 · <b style="color:#16A34A">32.6%</b></div></div></div>
+            <div class="item" style="padding:8px 4px"><div class="pill b">B 业务理解型</div>
+              <div class="body"><div class="meta">发 32 条 · 回复 6 · <b>18.8%</b></div></div></div>
+            <div class="item" style="padding:8px 4px;border:0"><div class="pill a">旧版（长文）</div>
+              <div class="body"><div class="meta">发 20 条 · 回复 1 · <b style="color:#DC2626">5.0%</b></div></div></div>
+          </div>
+          <div class="tiny" style="margin-top:10px">建议：A 版继续用，B 版只在 JD 强调业务时用</div>
+        </div>
+        <div class="card">
+          <h3>待跟进</h3>
+          <div class="list">
+            <div class="item" style="padding:8px 4px"><div class="avatar" style="width:30px;height:30px;font-size:11px">法</div>
+              <div class="body"><div class="ttl" style="font-size:13px">法本 · 要简历</div><div class="meta">2 小时前</div></div>
+              <div class="pill b">回</div></div>
+            <div class="item" style="padding:8px 4px;border:0"><div class="avatar" style="width:30px;height:30px;font-size:11px">亿</div>
+              <div class="body"><div class="ttl" style="font-size:13px">亿达 · 约面</div><div class="meta">昨天 · 周三 14:00</div></div>
+              <div class="pill g">日历</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 11 会话管家 ============ -->
+<div class="screen" id="s11">
+  <div class="main" style="width:100%">
+    <div class="topbar"><h2>会话</h2><span class="sub">3 条未读 · 1 条待回</span>
+      <div class="right"><div class="chip on">全部</div><div class="chip">待回</div><div class="chip">约面</div></div></div>
+    <div class="content row" style="gap:0;padding:0">
+      <div style="width:340px;border-right:1px solid var(--line);padding:12px">
+        <div class="conv on"><div class="avatar">法</div><div class="body" style="flex:1">
+          <div class="ttl" style="font-size:13.5px">法本 · 欧阳先生</div>
+          <div class="meta" style="font-size:12px">方便发一份简历吗？</div></div><div class="pill r">1</div></div>
+        <div class="conv"><div class="avatar">亿</div><div class="body" style="flex:1">
+          <div class="ttl" style="font-size:13.5px">亿达 · 李女士</div>
+          <div class="meta" style="font-size:12px">周三下午方便来面试吗</div></div><div class="pill r">2</div></div>
+        <div class="conv"><div class="avatar">文</div><div class="body" style="flex:1">
+          <div class="ttl" style="font-size:13.5px">文云文化 · 方女士</div>
+          <div class="meta" style="font-size:12px">已读 · 2 天前</div></div></div>
+        <div class="conv"><div class="avatar">深</div><div class="body" style="flex:1">
+          <div class="ttl" style="font-size:13.5px">深德科 · 许女士</div>
+          <div class="meta" style="font-size:12px">未读 · 今日</div></div><div class="pill r">1</div></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column">
+        <div style="padding:12px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px">
+          <div class="avatar">法</div>
+          <div><div style="font-size:14px;font-weight:650">法本 · 欧阳先生</div>
+            <div class="tiny">高级招聘经理 · 在线</div></div>
+          <div class="pill b" style="margin-left:auto">Java developer-双休</div>
+        </div>
+        <div style="flex:1;padding:18px 22px;overflow:hidden">
+          <div class="tiny" style="text-align:center;margin-bottom:14px">今天 13:40</div>
+          <div class="bubble me">外企项目这块我做过类似的接口对接，Spring Boot + MyBatis-Plus 是日常，可每周 5 天…</div>
+          <div class="bubble them">方便发一份简历吗？</div>
+          <div class="ai-card">
+            <div class="row" style="margin-bottom:8px"><span class="pill b">AI 草稿</span>
+              <span class="tiny" style="margin-left:auto">基于 3 条历史对话 + 你的简历</span></div>
+            好的，附件简历已发送。我目前在广州，随时可以到岗；周三下午或周四上午都可以面试，看您方便。<br>
+            <div class="row" style="gap:8px;margin-top:10px"><div class="btn primary sm">发送</div>
+              <div class="btn ghost sm">改一下</div><div class="btn ghost sm">换一句</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 12 网申代填 ============ -->
+<div class="screen" id="s12">
+  <div class="main" style="width:100%">
+    <div class="topbar"><h2>网申代填</h2><span class="sub">北森 · 某国企 2027 校招</span>
+      <div class="right"><div class="pill a">已填 23 / 缺 4</div><div class="btn ghost">逐项检查</div>
+        <div class="btn" style="background:#E5E9F0;color:#94A3B8">提交（请在网页里操作）</div></div></div>
+    <div class="content row">
+      <div class="card" style="flex:1.3">
+        <h3>基本信息</h3>
+        <div class="row" style="gap:14px">
+          <div class="f" style="flex:1"><label>姓名</label><div class="in ok">张三</div></div>
+          <div class="f" style="flex:1"><label>性别</label><div class="in ok">男</div></div>
+          <div class="f" style="flex:1"><label>出生年月</label><div class="in ok">2005-03</div></div>
+        </div>
+        <div class="row" style="gap:14px">
+          <div class="f" style="flex:1"><label>手机号码</label><div class="in ok">138****8866</div></div>
+          <div class="f" style="flex:1"><label>电子邮箱</label><div class="in ok">gaosheng@…</div></div>
+          <div class="f" style="flex:1"><label>政治面貌 *</label><div class="in miss">未填 · 请手动补</div></div>
+        </div>
+        <div class="divider"></div>
+        <h3>教育背景</h3>
+        <div class="row" style="gap:14px">
+          <div class="f" style="flex:1"><label>最高学历</label><div class="in ok">本科</div></div>
+          <div class="f" style="flex:1.4"><label>毕业院校</label><div class="in ok">示例大学</div></div>
+          <div class="f" style="flex:1.2"><label>所学专业</label><div class="in ok">计算机科学与技术</div></div>
+        </div>
+        <div class="row" style="gap:14px">
+          <div class="f" style="flex:1"><label>入学时间</label><div class="in ok">2025-09</div></div>
+          <div class="f" style="flex:1"><label>毕业时间</label><div class="in ok">2027-06</div></div>
+          <div class="f" style="flex:1.6"><label>GPA / 排名 *</label><div class="in miss">简历里没有 · 请手动补</div></div>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card">
+          <h3>填写报告</h3>
+          <div class="col" style="gap:10px">
+            <div class="row" style="align-items:center"><span class="pill g">23</span><div style="font-size:13px">自动填入（绿框）</div></div>
+            <div class="row" style="align-items:center"><span class="pill a">2</span><div style="font-size:13px">置信度低，已标黄待确认</div></div>
+            <div class="row" style="align-items:center"><span class="pill r">4</span><div style="font-size:13px">事实库里没有，需你补</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>缺的 4 项</h3>
+          <div class="col" style="gap:7px">
+            <div class="tiny">政治面貌</div><div class="tiny">GPA / 排名</div>
+            <div class="tiny">英语等级（CET-6 分数）</div><div class="tiny">证明人及联系方式</div>
+          </div>
+        </div>
+        <div class="card" style="background:#FFFBF3;border-color:#F5E3C0">
+          <h3 style="color:#B45309">不会自动提交</h3>
+          <div class="tiny" style="line-height:1.9;color:#7C5B22">
+            填错一次就是事故。填完由你自己检查，在网页里点提交。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 13 设置 ============ -->
+<div class="screen" id="s13">
+  <div class="rail">
+    <div class="logo">JP</div>
+    <div class="navi"><i>◎</i>首页</div><div class="navi"><i>☰</i>清单</div>
+    <div class="navi"><i>✎</i>话术</div><div class="navi"><i>▤</i>台账</div>
+    <div class="sp"></div><div class="navi on"><i>⚙</i>设置</div>
+  </div>
+  <div class="main">
+    <div class="topbar"><h2>设置</h2><span class="sub">v0.3.1</span></div>
+    <div class="content row">
+      <div class="col" style="flex:1.2">
+        <div class="card">
+          <h3>运行</h3>
+          <div class="field"><div class="k">投递档位</div><div class="row" style="gap:6px;flex:1">
+            <div class="chip">保守 8</div><div class="chip on">标准 15</div><div class="chip">激进 30</div></div></div>
+          <div class="field"><div class="k">条间隔</div><div class="range"><i></i><b style="left:24%"></b><b style="left:50%"></b></div>
+            <div style="width:84px;text-align:right;font-size:12.5px" class="num">45–120s</div></div>
+          <div class="field" style="border:0"><div class="k">静默时段</div><div style="font-size:13px">00:00 – 07:00 不执行</div></div>
+        </div>
+        <div class="card">
+          <h3>AI</h3>
+          <div class="field"><div class="k">服务</div><div style="font-size:13px">DeepSeek（deepseek-chat）</div>
+            <div class="pill g" style="margin-left:auto">已连通</div></div>
+          <div class="field" style="border:0"><div class="k">API Key</div><div class="in" style="flex:1;font-family:ui-monospace">sk-••••••••••••3f9a</div>
+            <div class="btn ghost sm">测试</div></div>
+          <div class="tiny">关闭后走纯规则兜底：模板 + 闸门，质量降一档但完全离线</div>
+        </div>
+      </div>
+      <div class="col" style="flex:1">
+        <div class="card">
+          <h3>权限自检</h3>
+          <div class="col" style="gap:12px">
+            <div class="row" style="align-items:center"><span class="pill g">✓</span><div style="font-size:13px">无障碍服务</div><div class="tiny" style="margin-left:auto">已开启</div></div>
+            <div class="row" style="align-items:center"><span class="pill g">✓</span><div style="font-size:13px">悬浮窗</div><div class="tiny" style="margin-left:auto">已允许</div></div>
+            <div class="row" style="align-items:center"><span class="pill a">!</span><div style="font-size:13px">BOSS App 已安装</div><div class="tiny" style="margin-left:auto">v14.2</div></div>
+            <div class="row" style="align-items:center"><span class="pill g">✓</span><div style="font-size:13px">数据加密</div><div class="tiny" style="margin-left:auto">已开启</div></div>
+          </div>
+          <div class="divider"></div>
+          <div class="btn ghost" style="width:100%">重新检测</div>
+        </div>
+        <div class="card">
+          <h3>数据</h3>
+          <div class="field" style="border:0"><div class="k">本地台账</div><div style="font-size:13px">78 条投递 · 312 个岗位</div></div>
+          <div class="row" style="gap:8px"><div class="btn ghost sm">导出全部</div><div class="btn ghost sm">清理采集缓存</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 14 悬浮面板 ============ -->
+<div class="screen" id="s14">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div>
+        <div class="skel" style="width:52%;height:9px;background:#F2F5F9"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div>
+        <div class="skel" style="width:47%;height:9px;background:#F2F5F9"></div></div>
+      <div class="boss-card"><div class="skel" style="width:29%"></div><div class="skel" style="width:24%;height:9px"></div>
+        <div class="skel" style="width:55%;height:9px;background:#F2F5F9"></div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span class="mark"></span>JobPilot <span class="st">运行中</span><span class="x">— ✕</span></div>
+    <div class="plab">投递档位</div>
+    <div class="ptier"><div>保守</div><div class="on">标准</div><div>激进</div></div>
+    <div class="plab">每日上限</div><div class="pval">15 条</div>
+    <div style="height:5px;background:rgba(255,255,255,.12);border-radius:9px;position:relative">
+      <i style="position:absolute;left:0;right:30%;top:0;bottom:0;background:#22C55E;border-radius:9px"></i>
+      <b style="position:absolute;right:30%;top:-5px;width:14px;height:14px;border-radius:50%;background:#fff"></b></div>
+    <div class="plab">条间隔</div><div class="pval">45–120 秒</div>
+    <div style="height:5px;background:rgba(255,255,255,.12);border-radius:9px;position:relative">
+      <i style="position:absolute;left:0;right:46%;top:0;bottom:0;background:#22C55E;border-radius:9px"></i>
+      <b style="position:absolute;right:46%;top:-5px;width:14px;height:14px;border-radius:50%;background:#fff"></b></div>
+    <div class="pbtns"><div>采集</div><div class="gray">⏸ 暂停</div><div class="gray">■ 停止</div></div>
+    <div class="plab">运行日志</div>
+    <div class="plog">
+      <div>[12:04:03] 亿达信息 送达 ✓</div>
+      <div>[12:05:41] 法本 送达 ✓</div>
+      <div>[12:07:22] 深德科 送达 ✓</div>
+      <div>[12:08:10] 文云文化 输入中…</div>
+    </div>
+    <div class="handle"></div>
+  </div>
+</div>
+
+<!-- ============ 15 面板 v2 · 采集 ============ -->
+<div class="screen" id="s15">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:29%"></div><div class="skel" style="width:24%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:37%"></div><div class="skel" style="width:20%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p2">
+    <div class="hd"><span class="mark"></span>JobPilot <span class="st"><i></i>已连接</span><div class="ic">↻ ✕</div></div>
+    <div class="ctx"><i></i>已识别：BOSS 职位列表<span>v14.2</span></div>
+    <div class="tabs"><div class="on">采集</div><div>投递</div><div>回复 <b>2</b></div></div>
+    <div class="lab">当前条件</div>
+    <div class="cond"><div>Java 后端</div><div>广州</div><div>6–12K</div><div>应届/不限</div><div>排除外包</div></div>
+    <div class="big g">▶ 采集当前屏（约 9 条）</div>
+    <div class="tiles">
+      <div class="t"><b>12</b><span>已读到</span></div>
+      <div class="t"><b>8</b><span>新入库</span></div>
+    </div>
+    <div class="drl">运行日志 <span class="ch">›</span></div>
+    <div class="drl">待投清单 <b>8</b></div>
+  </div>
+</div>
+
+<!-- ============ 16 面板 v2 · 投递 ============ -->
+<div class="screen" id="s16">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:29%"></div><div class="skel" style="width:24%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p2">
+    <div class="hd"><span class="mark"></span>JobPilot <span class="st"><i></i>运行中</span><div class="ic">↻ ✕</div></div>
+    <div class="ctx"><i></i>已识别：BOSS 职位列表<span>v14.2</span></div>
+    <div class="tabs"><div>采集</div><div class="on">投递 <b>3</b></div><div>回复 <b>2</b></div></div>
+    <div class="sel">已选 <b>&nbsp;3&nbsp;</b> / 8 <div class="r"><span>全选</span><span>清空</span></div></div>
+    <div class="jc on"><div class="ck"></div><div class="b">
+      <div class="n">文云文化 · Java 后端开发</div>
+      <div class="m">广州·天河·棠下 · 8-13K · 应届</div>
+      <div class="g">看到岗位要 Spring / MyBatis + MySQL 基础，我实习时用 Spring Boot + MyBatis-Plus 做过电商商城的商品…</div>
+    </div><div class="spill">9/9</div></div>
+    <div class="jc on"><div class="ck"></div><div class="b">
+      <div class="n">亿达信息 · Java 开发工程师</div>
+      <div class="m">广州·天河·体育中心 · 6-9K · 1-3年</div>
+      <div class="g">你们这个岗做接口开发和联调，我在某某网络做过内容后台的文章发布、权限和定时统计…</div>
+    </div><div class="spill">9/9</div></div>
+    <div class="jc"><div class="ck"></div><div class="b">
+      <div class="n">法本 · Java developer</div>
+      <div class="m">广州·海珠·琶洲 · 面议 · 3-5年</div>
+      <div class="g">外企项目这块我做过类似的接口对接，Spring Boot + MyBatis-Plus 是日常…</div>
+    </div><div class="spill warn">待改</div></div>
+    <div class="quota">⚡ 今日 <b>&nbsp;8&nbsp;</b> / 15 <span>标准档 · 剩 7 条</span></div>
+    <div class="tgl">拟人节奏（45–120s 随机）<div class="sw"></div></div>
+    <div class="f2">
+      <div class="big dang">结束任务</div>
+      <div class="big g">确认投递 3 家</div>
+    </div>
+    <div class="hint gray">发送前会核对公司名，不匹配就跳过，不会发错人</div>
+  </div>
+</div>
+
+<!-- ============ 17 面板 v2 · 回复 ============ -->
+<div class="screen" id="s17">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div style="padding:18px 440px 18px 22px;display:flex;flex-direction:column;gap:12px">
+      <div class="bubble them" style="max-width:340px">方便发一份简历吗？</div>
+      
+      <div class="bubble me" style="align-self:flex-end;max-width:400px;background:#16A34A;color:#fff">好的，附件简历已发送。我目前在广州，随时可以到岗…</div>
+      <div class="bubble them" style="max-width:360px">周三下午能来面试吗？</div>
+    </div>
+  </div>
+  <div class="p2">
+    <div class="hd"><span class="mark"></span>JobPilot <span class="st"><i></i>已连接</span><div class="ic">↻ ✕</div></div>
+    <div class="ctx"><i></i>已识别：招聘沟通页<span>v14.2</span></div>
+    <div class="tabs"><div>采集</div><div>投递</div><div class="on">回复 <b>2</b></div></div>
+    <div class="c2">
+      <div class="crow"><i>👤</i>当前联系人<b>林女士 · 招聘经理</b></div>
+      <div class="crow"><i>💼</i>沟通职位<b>Java 后端 · 8-13K</b></div>
+      <div class="crow"><i>📄</i>当前简历<b>Java 后端 · v2</b></div>
+    </div>
+    <div class="lab">生成依据</div>
+    <div class="cond"><div>当前职位</div><div>我的简历</div><div>历史对话 12 条</div></div>
+    <div class="big">✦ 生成回复语</div>
+    <div class="lab">回复草稿 · 可直接编辑</div>
+    <div class="ta">您好！周三下午我可以到公司面试，15:00 之后都方便。我目前在广州天河，过来大约 40 分钟。需要我带作品集或项目材料吗？</div>
+    <div class="mini3"><div class="big ghost">重新生成</div><div class="big ghost">复制草稿</div></div>
+    <div class="big" style="margin-top:6px">填入输入框</div>
+    <div class="hint">只填入草稿，不自动发送</div>
+  </div>
+</div>
+
+<!-- ============ 18 面板 v2 · 三种形态 ============ -->
+<div class="screen" id="s18" style="background:#EDF1F7;flex-direction:column;padding:34px 44px">
+  <div style="font-size:21px;font-weight:700;letter-spacing:-.01em">悬浮面板的三种形态</div>
+  <div style="font-size:12.5px;color:#64748B;margin:6px 0 26px">
+    拖到屏幕边缘自动吸附成把手；双击把手或小球展开。三种形态共用同一份状态，切换不丢进度。
+  </div>
+
+  <div style="display:flex;gap:26px;flex:1;min-height:0">
+    <!-- ① 完整面板 -->
+    <div style="flex:1.25;display:flex;flex-direction:column;min-width:0">
+      <div style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;
+                  display:flex;align-items:center;justify-content:center;position:relative">
+        <div class="p2" style="position:relative;right:auto;top:auto;transform:scale(.82);margin:-40px">
+          <div class="hd"><span class="mark"></span>JobPilot
+            <span class="st"><i></i>运行中</span><div class="ic">↻ ✕</div></div>
+          <div class="ctx"><i></i>已识别：BOSS 职位列表<span>v14.2</span></div>
+          <div class="tabs"><div>采集</div><div class="on">投递 <b>3</b></div><div>回复 <b>2</b></div></div>
+          <div class="quota">⚡ 今日 <b>&nbsp;8&nbsp;</b> / 15 <span>标准档</span></div>
+          <div class="f2"><div class="big dang">结束任务</div><div class="big g">确认投递 3 家</div></div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="font-size:14px;font-weight:700">① 完整面板</div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.7">
+          392dp 宽 · 可拖 · 右下角 ◢ 缩放 · 顶部 Tab 切换</div>
+      </div>
+    </div>
+
+    <!-- ② 贴边把手 -->
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+      <div style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;position:relative">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:76%"></div>
+        <div style="position:absolute;right:0;top:0;bottom:0;width:24%;background:#F6F8FB;border-left:1px dashed #CBD5E1"></div>
+        <div style="position:absolute;right:0;top:50%;transform:translateY(-50%)" class="grip"><b>3</b>投递</div>
+        <div style="position:absolute;right:84px;top:50%;transform:translateY(-50%);font-size:11.5px;color:#94A3B8;text-align:right;line-height:1.8">
+          屏幕右边缘<br>只露 26dp
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="font-size:14px;font-weight:700">② 贴边把手</div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.7">
+          拖到边缘自动吸附，不挡内容；把手上的数字是待投条数</div>
+      </div>
+    </div>
+
+    <!-- ③ 悬浮小球 -->
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+      <div style="flex:1;background:#fff;border:1px solid #E2E8F0;border-radius:16px;
+                  display:flex;align-items:center;justify-content:center;position:relative">
+        <div class="ball" style="position:relative;right:auto;top:auto;width:72px;height:72px">
+          <b style="font-size:16px">8</b><span style="font-size:9px">/15 今日</span>
+          <div class="badge" style="width:20px;height:20px;font-size:10px">2</div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <div style="font-size:14px;font-weight:700">③ 悬浮小球</div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.7">
+          长按标题收起；红点是待回复数，绿环是今日额度</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ============ 19 面板 v3 · 自动筛选运行中 ============ -->
+<div class="screen" id="s19">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:29%"></div><div class="skel" style="width:24%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p3">
+    <div class="hd"><span class="mark"></span>JobPilot<div class="ic">↻ ✕</div></div>
+    <div class="rec"><i></i>已识别：BOSS 职位列表<span>v14.2</span></div>
+    <div class="seg"><div class="on">筛选</div><div>待投 <i>12</i></div><div>诊断</div><div>回复</div></div>
+    <div class="body">
+      <div class="bx">
+        <div class="h">自动筛选<span class="tag">运行中</span></div>
+        <div class="steps"><div class="done"></div><div class="done"></div><div class="now"></div><div></div><div></div><div></div></div>
+        <div class="slab"><span>第 3 步 / 6 · 分析职位详情</span><b>48%</b></div>
+        <div class="cur" style="margin-top:9px">正在分析 <em>文云文化 · Java 后端（27 届）</em></div>
+        <div class="two" style="margin-top:9px">
+          <div class="n"><b>48</b><span>已筛选职位</span></div>
+          <div class="n"><b>12</b><span>筛出职位</span></div>
+        </div>
+        <div class="row3" style="margin-top:9px"><div class="m">⏸ 暂停</div><div class="m red">■ 结束</div></div>
+      </div>
+      <div class="dr">运行日志 <span class="a">›</span></div>
+      <div class="dr">待投列表 <b>12</b><span class="a">›</span></div>
+      <div class="dr">查看执行现场 <span class="a">›</span></div>
+      <div class="kv">使用简历<b>Java 后端 · v2</b></div>
+    </div>
+    <div class="foot"><div class="note">只筛选入待投递 · 投递前再次确认 · 验证出现自动暂停</div></div>
+  </div>
+</div>
+
+<!-- ============ 20 面板 v3 · 筛选条件 ============ -->
+<div class="screen" id="s20">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p3">
+    <div class="hd"><span class="mark"></span>筛选条件<div class="ic">↺ 从求职意向填入 ✕</div></div>
+    <div class="seg"><div class="on">筛选</div><div>待投</div><div>诊断</div><div>回复</div></div>
+    <div class="body">
+      <div class="bx">
+        <div class="h">关键词</div>
+        <div class="chp" style="margin-top:7px"><div class="on">Java</div><div class="on">后端开发</div><div class="on">Java 实习</div><div>全栈</div></div>
+      </div>
+      <div class="bx">
+        <div class="kv">城市<b>广州 · 深圳</b></div>
+        <div class="kv">薪资<b>6–12K</b></div>
+        <div class="kv">经验<b>应届 / 经验不限</b></div>
+        <div class="kv">学历<b>本科 / 大专</b></div>
+        <div class="kv">公司规模<b>20–999 人</b></div>
+        <div class="kv" style="padding-bottom:0">活跃时间<b>今日 / 刚刚活跃</b></div>
+      </div>
+      <div class="bx">
+        <div class="h">排除规则<span class="tag gray">4 条</span></div>
+        <div class="chp" style="margin-top:7px"><div class="on">外包/驻场</div><div class="on">培训机构</div><div class="on">销售/客服</div><div class="on">微服务治理</div></div>
+        <div class="kv" style="margin-top:6px">排除已投递<span style="margin-left:auto;color:#4ADE80">开</span></div>
+        <div class="kv" style="padding-bottom:0">排除已沟通<span style="margin-left:auto;color:#4ADE80">开</span></div>
+      </div>
+      <div class="bx">
+        <div class="kv">本轮筛选数量<b>30 个</b></div>
+        <div class="cur" style="margin-top:6px">筛到 30 个就停，只进待投递，不直接投</div>
+      </div>
+    </div>
+    <div class="foot"><div class="big g" style="height:40px">开始筛选</div></div>
+  </div>
+</div>
+
+<!-- ============ 21 面板 v3 · 待投列表 ============ -->
+<div class="screen" id="s21">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p3">
+    <div class="hd"><span class="mark"></span>JobPilot<div class="ic">↻ ✕</div></div>
+    <div class="rec"><i></i>已识别：BOSS 职位列表<span>v14.2</span></div>
+    <div class="seg"><div>筛选</div><div class="on">待投 <i>12</i></div><div>诊断</div><div>回复</div></div>
+    <div class="body">
+      <div class="sel" style="display:flex;align-items:center;font-size:11px;color:#8A99AE">
+        已选 <b style="color:#fff;margin:0 3px">3</b> / 12
+        <span style="margin-left:auto;display:flex;gap:10px;color:#5B9BFF;font-size:10.5px"><span>全选</span><span>清空</span></span>
+      </div>
+      <div class="jrow on"><div class="ck"></div><div class="i">
+        <div class="t">文云文化 · Java 后端开发</div>
+        <div class="s">广州·天河·棠下 · 8-13K · 应届</div>
+        <div class="s" style="color:#5B9BFF;margin-top:3px">话术 · 82 字 · 闸门 9/9</div>
+      </div><div class="p"><span class="sc">86</span><span class="st">本次入车</span></div></div>
+      <div class="jrow on"><div class="ck"></div><div class="i">
+        <div class="t">亿达信息 · Java 开发工程师</div>
+        <div class="s">广州·天河·体育中心 · 6-9K · 1-3年</div>
+        <div class="s" style="color:#5B9BFF;margin-top:3px">话术 · 76 字 · 闸门 9/9</div>
+      </div><div class="p"><span class="sc">81</span><span class="st">本次入车</span></div></div>
+      <div class="jrow on"><div class="ck"></div><div class="i">
+        <div class="t">文云文化 · AI 应用开发实习</div>
+        <div class="s">广州·天河·棠下 · 150-300/天 · 在校</div>
+        <div class="s" style="color:#5B9BFF;margin-top:3px">话术 · 79 字 · 闸门 9/9</div>
+      </div><div class="p"><span class="sc">79</span><span class="st">本次入车</span></div></div>
+      <div class="jrow"><div class="ck"></div><div class="i">
+        <div class="t">法本 · Java developer</div>
+        <div class="s">广州·海珠·琶洲 · 面议 · 3-5年</div>
+        <div class="s" style="color:#FBBF24;margin-top:3px">话术待改 · 闸门 7/9</div>
+      </div><div class="p"><span class="sc mid">72</span><span class="st">本次入车</span></div></div>
+      <div class="quota" style="display:flex;align-items:center;gap:7px;font-size:11px;color:#CBD5E1;
+           background:rgba(37,99,235,.14);border-radius:9px;padding:8px 10px">
+        ⚡ 今日已投 <b style="color:#fff;margin:0 2px">8</b> / 30 <span style="margin-left:auto;color:#8A99AE;font-size:9.5px">剩余 22</span>
+      </div>
+      <div class="tgl" style="display:flex;align-items:center;gap:8px;font-size:10.5px;color:#CBD5E1">
+        自动发送 <span style="color:#64748B">图片简历</span>
+        <div class="sw" style="width:30px;height:17px;border-radius:9px;background:#22C55E;margin-left:auto;position:relative">
+          <i style="position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff"></i></div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="big g" style="height:40px">确认投递 3 个职位</div>
+      <div class="note">请保持 BOSS 执行页开启</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 22 面板 v3 · 投递确认 ============ -->
+<div class="screen" id="s22">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p3" style="position:absolute;height:812px">
+    <div class="hd"><span class="mark"></span>JobPilot<div class="ic">↻ ✕</div></div>
+    <div class="rec"><i></i>已识别：BOSS 职位列表<span>v14.2</span></div>
+    <div class="seg"><div>筛选</div><div class="on">待投 <i>12</i></div><div>诊断</div><div>回复</div></div>
+    <div class="body" style="opacity:.3">
+      <div class="jrow on"><div class="ck"></div><div class="i"><div class="t">文云文化 · Java 后端开发</div>
+        <div class="s">广州·天河·棠下 · 8-13K</div></div></div>
+      <div class="jrow on"><div class="ck"></div><div class="i"><div class="t">亿达信息 · Java 开发工程师</div>
+        <div class="s">广州·天河·体育中心 · 6-9K</div></div></div>
+      <div class="jrow on"><div class="ck"></div><div class="i"><div class="t">文云文化 · AI 应用开发实习</div>
+        <div class="s">广州·天河·棠下 · 150-300/天</div></div></div>
+      <div class="jrow"><div class="ck"></div><div class="i"><div class="t">法本 · Java developer</div>
+        <div class="s">广州·海珠·琶洲 · 面议</div></div></div>
+      <div class="jrow"><div class="ck"></div><div class="i"><div class="t">深德科 · Java 金融</div>
+        <div class="s">广州·海珠·琶洲 · 4-5K</div></div></div>
+    </div>
+    <div class="mask"></div>
+    <div class="sheet">
+      <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:9px">确认投递 3 个职位</div>
+      <div class="kv" style="border-bottom:1px solid rgba(255,255,255,.07);padding:6px 0">当前简历<b>Java 后端 · v2</b></div>
+      <div class="kv" style="border-bottom:1px solid rgba(255,255,255,.07);padding:6px 0">投递动作<b>建立沟通 + 发送打招呼语</b></div>
+      <div class="kv" style="border-bottom:1px solid rgba(255,255,255,.07);padding:6px 0">简历图片<b>不附带</b></div>
+      <div class="kv" style="border-bottom:1px solid rgba(255,255,255,.07);padding:6px 0">预计耗时<b>约 4 分钟</b></div>
+      <div class="kv" style="padding:6px 0">今日额度<b>8 / 30 · 剩余 22</b></div>
+      <div class="cur" style="margin-top:8px">投递前会逐个核对公司名并保留间隔</div>
+      <div class="row3" style="margin-top:10px">
+        <div class="m">返回复核</div>
+        <div class="m" style="flex:1.6;background:#22C55E;color:#fff;font-weight:600">确认并开始投递</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 23 面板 v3 · 职位诊断 ============ -->
+<div class="screen" id="s23">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+      <div class="skel" style="width:26%;height:15px"></div>
+      <div class="skel" style="width:38%;height:10px"></div>
+      <div class="skel" style="width:64%;height:9px;background:#E9EEF6"></div>
+      <div class="skel" style="width:72%;height:9px;background:#E9EEF6"></div>
+      <div class="skel" style="width:58%;height:9px;background:#E9EEF6"></div>
+    </div>
+  </div>
+  <div class="p3">
+    <div class="hd"><span class="mark"></span>职位诊断<div class="ic">↻ ✕</div></div>
+    <div class="rec"><i></i>已识别：BOSS 职位详情<span>v14.2</span></div>
+    <div class="seg"><div>筛选</div><div>待投</div><div class="on">诊断</div><div>回复</div></div>
+    <div class="body">
+      <div class="bx">
+        <div style="display:flex;align-items:center;gap:11px">
+          <div class="ring"><div><b>86</b><span>匹配度</span></div></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;color:#fff;font-weight:600">文云文化 · Java 后端（27 届）</div>
+            <div style="font-size:10px;color:#7C8AA0;margin-top:3px">广州·天河·棠下 · 8-13K · 应届本科</div>
+            <div class="chp" style="margin-top:6px"><div>Java</div><div>Spring</div><div>MySQL</div><div>Redis</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="bx"><div class="lst"><b>优势</b>
+        内容与数据能力可迁移：实习做过电商商城的商品/订单/支付模块，接口设计、表结构、联调都独立跟过。<br>
+        技术栈高度重合：JD 要 Spring / MyBatis + MySQL，两段实习都在用。</div></div>
+      <div class="bx"><div class="lst bad"><b>短板</b>
+        缺 Kafka 与微服务治理经验；要求 1-3 年，你只有实习。</div></div>
+      <div class="bx"><div class="lst tip"><b>下一步建议</b>
+        话术里别提 Kafka；把「独立排查线上问题 + 索引优化」往前放，抵消年限顾虑。</div></div>
+      <div class="row3"><div class="m">针对岗位优化简历</div><div class="m">查看完整 JD</div></div>
+    </div>
+    <div class="foot">
+      <div class="big" style="height:40px;background:#2563EB">使用这段打招呼语沟通</div>
+      <div class="note">会填入 BOSS 输入框，需要你自己按发送</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 24 面板 v3 · 回复 ============ -->
+<div class="screen" id="s24">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div style="padding:18px 22px 18px 22px;display:flex;flex-direction:column;gap:12px;max-width:820px">
+      <div class="bubble them" style="max-width:340px">方便发一份简历吗？</div>
+      <div class="bubble me" style="align-self:flex-end;max-width:400px;background:#16A34A;color:#fff">好的，附件简历已发送。我目前在广州，随时可以到岗…</div>
+      <div class="bubble them" style="max-width:360px">周三下午能来面试吗？</div>
+    </div>
+  </div>
+  <div class="p3">
+    <div class="hd"><span class="mark"></span>JobPilot<div class="ic">↻ ✕</div></div>
+    <div class="rec"><i></i>已识别：招聘沟通页<span>v14.2</span></div>
+    <div class="seg"><div>筛选</div><div>待投</div><div>诊断</div><div class="on">回复</div></div>
+    <div class="body">
+      <div class="bx">
+        <div class="kv" style="padding:4px 0">当前联系人<b>林女士 · 招聘经理</b></div>
+        <div class="kv" style="padding:4px 0">沟通职位<b>Java 后端 · 8-13K</b></div>
+        <div class="kv" style="padding:4px 0">当前简历<b>Java 后端 · v2</b></div>
+        <div class="kv" style="padding:4px 0 0">生成依据<b>职位 · 简历 · 历史 12 条</b></div>
+      </div>
+      <div class="row3"><div class="m">✦ 生成回复语</div><div class="m">重新读取会话</div></div>
+      <div class="bx">
+        <div class="h">回复草稿<span class="tag gray" style="background:none;color:#64748B">68 字</span></div>
+        <div style="margin-top:7px;background:rgba(0,0,0,.3);border-radius:8px;padding:8px 9px;
+                    font-size:10.5px;line-height:1.7;color:#DCE4F0">
+          您好！周三下午我可以到公司面试，15:00 之后都方便。我目前在广州天河，过来大约 40 分钟。需要我带项目材料吗？</div>
+        <div class="row3" style="margin-top:8px"><div class="m">重新生成</div><div class="m">复制</div></div>
+      </div>
+      <div class="tgl" style="display:flex;align-items:center;gap:8px;font-size:10.5px;color:#CBD5E1">
+        自动生成回复语
+        <div class="sw" style="width:30px;height:17px;border-radius:9px;background:#22C55E;margin-left:auto;position:relative">
+          <i style="position:absolute;right:2px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff"></i></div>
+      </div>
+      <div class="cur" style="font-size:9.5px">开启后，新打开的对话会自动生成草稿，仍需你手动发送</div>
+    </div>
+    <div class="foot">
+      <div class="big" style="height:40px;background:#2563EB">填入输入框</div>
+      <div class="note">填入草稿，不自动发送</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 25 面板 v3 · 更多 ============ -->
+<div class="screen" id="s25">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card"><div class="skel" style="width:34%"></div><div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p3">
+    <div class="hd"><span class="mark"></span>更多<div class="ic">↻ ✕</div></div>
+    <div class="body" style="padding-top:4px">
+      <div class="bx">
+        <div class="h">简历</div>
+        <div class="kv" style="padding:6px 0 4px">当前使用<b>Java 后端 · v2</b></div>
+        <div class="row3"><div class="m">切换简历</div><div class="m">深度优化</div><div class="m">管理</div></div>
+      </div>
+      <div class="bx">
+        <div class="h">网申助手<span class="tag blue">已识别表单</span></div>
+        <div class="cur" style="margin-top:7px">北森 · 某国企 2027 校招 · 30 个字段</div>
+        <div class="row3" style="margin-top:8px"><div class="m" style="flex:1">帮我填表单</div></div>
+        <div style="font-size:9.5px;color:#64748B;margin-top:6px;line-height:1.6">
+          只填简历里有的信息；缺失项标黄，由你补；不会替你提交。</div>
+      </div>
+      <div class="bx">
+        <div class="h">Agent 工具调用<span class="tag">就绪</span></div>
+        <div class="kv" style="padding:6px 0 3px">最近调用<b>boss_list_scan</b></div>
+        <div class="kv" style="padding:0 0 5px">耗时<b>2.4s · 成功</b></div>
+        <div class="row3"><div class="m">查看日志</div><div class="m">重试</div></div>
+      </div>
+      <div class="bx">
+        <div class="h">历史任务<span class="tag gray">3</span></div>
+        <div class="kv" style="padding:5px 0">昨天 21:04<b>批次 8 家 · 8 送达</b></div>
+        <div class="kv" style="padding:0 0 5px">前天 12:30<b>批次 5 家 · 4 送达</b></div>
+        <div class="row3"><div class="m">清空本地历史</div></div>
+      </div>
+      <div class="kv" style="padding:4px 2px">主题<b>跟随系统</b></div>
+      <div class="kv" style="padding:0 2px">版本<b>v0.3.1 · 无障碍已连接</b></div>
+    </div>
+    <div class="foot"><div class="note">所有数据保存在本机 · 简历不上传</div></div>
+  </div>
+</div>
+<!-- ============ 26 面板 v3 · 验证中断 ============ -->
+<div class="screen" id="s26">
+  <div class="bossbg">
+    <div class="boss-hd">BOSS 直聘</div>
+    <div class="boss-list">
+      <div class="boss-card" style="border:1px solid #F5C2C2"><div class="skel" style="width:34%"></div>
+        <div class="skel" style="width:22%;height:9px"></div></div>
+      <div class="boss-card"><div class="skel" style="width:41%"></div><div class="skel" style="width:26%;height:9px"></div></div>
+    </div>
+  </div>
+  <div class="p3">
+    <div class="hd"><span class="mark"></span>JobPilot<div class="ic">↻ ✕</div></div>
+    <div class="rec" style="background:rgba(245,158,11,.12);color:#FBBF24">
+      <i style="background:#F59E0B"></i>已识别：BOSS 安全验证<span>已暂停</span></div>
+    <div class="seg"><div class="on">筛选</div><div>待投 <i>12</i></div><div>诊断</div><div>回复</div></div>
+    <div class="body">
+      <div class="bx" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25)">
+        <div class="h" style="color:#FBBF24">⚠ 需要完成 BOSS 验证</div>
+        <div style="font-size:10.5px;line-height:1.7;color:#CBB89A;margin-top:7px">
+          检测到滑块验证，任务已安全暂停。<br>已完成的进度和待投递的 12 个职位都保留。</div>
+        <div class="steps" style="margin-top:9px"><div class="done"></div><div class="done"></div><div class="done"></div><div></div><div></div><div></div></div>
+        <div class="slab"><span>停在第 4 步 / 6 · AI 评估</span><b style="color:#FBBF24">已暂停</b></div>
+      </div>
+      <div class="two">
+        <div class="n"><b>48</b><span>已筛选职位</span></div>
+        <div class="n"><b>12</b><span>筛出职位</span></div>
+      </div>
+      <div class="big g" style="height:40px;background:#F59E0B">去 BOSS 处理</div>
+      <div class="row3"><div class="m" style="flex:1">处理完成，继续任务</div></div>
+      <div class="cur" style="font-size:9.5px">处理完回到这里点继续；不会自动重试，避免反复触发验证</div>
+      <div class="kv" style="padding-top:4px">使用简历<b>Java 后端 · v2</b></div>
+    </div>
+    <div class="foot"><div class="note">连续 2 次验证 → 今日自动停止，保护账号</div></div>
+  </div>
+</div>
+<script>
+// 收集所有屏幕放进画板
+const grid = document.getElementById('grid');
+const caps = [
+  ['01 首页 / 今日概览','进入即知今天该做什么'],
+  ['02 采集条件','关键词、城市、排除规则'],
+  ['03 采集进行中','只读，滚动 5 屏'],
+  ['04 待投清单','匹配分排序 + 批量勾选'],
+  ['05 岗位详情 + 三件套','优势 / 不足 / 建议 + 关键词对齐'],
+  ['06 话术工作台','卡片流 + 9 条闸门实时校验'],
+  ['07 批量确认','发送前最后一次人工闸门'],
+  ['08 执行中','实时进度 + 熔断监控'],
+  ['09 核验报告','三态核验逐条结果'],
+  ['10 台账 / 漏斗','转化率 + 话术 A/B'],
+  ['11 会话管家','HR 回复 + AI 草稿'],
+  ['12 网申代填','北森 / Moka 表单'],
+  ['13 设置','档位、AI、权限自检'],
+  ['14 悬浮面板 v1','浮在 BOSS App 之上'],
+  ['15 面板 v2 · 采集','页面识别 + 条件 + 一键采集'],
+  ['16 面板 v2 · 投递','勾选 + 话术预览 + 配额 + 确认'],
+  ['17 面板 v2 · 回复','上下文 + 生成依据 + 草稿'],
+  ['18 面板 v2 · 三形态','完整 / 贴边 / 小球'],
+  ['19 面板 v3 · 自动筛选','6 步进度 + 双计数 + 验证中断'],
+  ['20 面板 v3 · 筛选条件','关键词/城市/薪资/排除规则'],
+  ['21 面板 v3 · 待投列表','勾选 + 配额 + 自动发简历'],
+  ['22 面板 v3 · 投递确认','投递前最后一次复核'],
+  ['23 面板 v3 · 职位诊断','匹配度 + 优势/短板/建议'],
+  ['24 面板 v3 · 回复','上下文 + 生成依据 + 自动生成'],
+  ['25 面板 v3 · 更多','简历/网申/Agent/历史'],
+  ['26 面板 v3 · 验证中断','滑块/人脸出现时的安全暂停']
+];
+for (let i = 1; i <= 26; i++) {
+  const el = document.getElementById('s' + i);
+  const wrap = document.createElement('div');
+  wrap.className = 'wrap';
+  const cap = document.createElement('div');
+  cap.className = 'cap';
+  cap.innerHTML = '<b>' + caps[i-1][0] + '</b><span>' + caps[i-1][1] + '</span>';
+  el.parentNode.removeChild(el);
+  wrap.appendChild(el);
+  wrap.appendChild(cap);
+  grid.appendChild(wrap);
+}
+
+// ?only=N 时只显示第 N 屏，方便截图
+const p = new URLSearchParams(location.search);
+const only = p.get('only');
+if (only) {
+  document.body.classList.add('only');
+  document.body.style.background = '#F4F6FA';
+  const board = document.getElementById('board');
+  board.style.padding = '0';
+  board.querySelector('h1').style.display = 'none';
+  board.querySelector('.lead').style.display = 'none';
+  document.querySelectorAll('.wrap').forEach(w => { w.style.display = 'none'; });
+  const el = document.getElementById('s' + only);
+  el.classList.add('on');
+  el.style.borderRadius = '0';
+  el.parentElement.style.display = 'block';
+}
+</script>
+</body>
+</html>

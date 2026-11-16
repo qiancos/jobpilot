@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JobPilot</string>
+    <string name="a11y_desc">读取招聘 App 的界面结构，用于自动投递与状态回传。不做任何后台截屏。</string>
+</resources>

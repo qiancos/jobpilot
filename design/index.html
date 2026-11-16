@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1220">
+<title>JobPilot · 原型 v2.0</title>
+<style>
+:root{
+  --bg:#0B1220; --card:#131C2E; --line:rgba(255,255,255,.08);
+  --ink:#E7EDF7; --sub:#8FA0B8; --faint:#5C6B82;
+  --green:#22C55E; --blue:#3B82F6; --amber:#F59E0B;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);
+  font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+
+/* 顶栏 */
+header{position:sticky;top:0;z-index:20;background:rgba(11,18,32,.92);
+  backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:14px 20px 12px}
+.hrow{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.meta{font-size:12px;color:var(--sub)}
+.tabs{display:flex;gap:8px;margin-top:12px;overflow-x:auto;padding-bottom:2px}
+.tab{flex:none;height:32px;padding:0 14px;border-radius:9px;background:rgba(255,255,255,.06);
+  color:var(--sub);font-size:12.5px;display:flex;align-items:center;gap:6px;cursor:pointer;
+  border:1px solid transparent;white-space:nowrap}
+.tab.on{background:rgba(34,197,94,.16);color:#6EE7A0;border-color:rgba(34,197,94,.35);font-weight:600}
+.tab b{font-size:10px;background:rgba(255,255,255,.12);border-radius:5px;padding:1px 5px;font-weight:600}
+
+/* 网格 */
+.grid{display:grid;gap:16px;padding:18px 20px 60px;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  cursor:pointer;transition:transform .15s ease,border-color .15s ease}
+.card:hover{transform:translateY(-2px);border-color:rgba(34,197,94,.4)}
+.card img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;background:#1A2438}
+.cap{display:flex;align-items:center;gap:9px;padding:11px 13px}
+.no{font-size:11px;font-weight:700;color:var(--faint);font-variant-numeric:tabular-nums}
+.ttl{font-size:13px;font-weight:600}
+.grp{margin-left:auto;font-size:10px;padding:2px 7px;border-radius:5px;
+  background:rgba(59,130,246,.16);color:#93C5FD}
+.grp.p{background:rgba(34,197,94,.16);color:#6EE7A0}
+
+/* 大图查看器 */
+.viewer{position:fixed;inset:0;background:rgba(4,8,16,.96);z-index:50;display:none;
+  flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.viewer.on{display:flex}
+.vbar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.vbar .t{font-size:14px;font-weight:600}
+.vbar .n{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+.vbar .x{margin-left:auto;width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;color:var(--sub)}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;min-height:0}
+.stage img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.nav{display:flex;gap:10px;padding:0 18px 18px}
+.nav div{flex:1;height:44px;border-radius:11px;background:rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:center;font-size:13.5px;cursor:pointer;color:var(--ink)}
+.nav div:hover{background:rgba(255,255,255,.14)}
+.nav div.pri{background:var(--green);color:#04140A;font-weight:700}
+.hint{font-size:11px;color:var(--faint);text-align:center;padding-bottom:10px}
+@media (max-width:600px){
+  .grid{grid-template-columns:1fr;gap:12px;padding:14px}
+  h1{font-size:17px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <h1>JobPilot · 高保真原型</h1>
+    <span class="meta" id="meta">26 屏 · v2.0 · 1280×854</span>
+    <a href="flow.html" style="margin-left:auto;font-size:12.5px;color:#6EE7A0;text-decoration:none;
+       border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.12);border-radius:9px;
+       padding:6px 12px">流程图 →</a>
+    <a href="wireframes.html" style="font-size:12.5px;color:#93C5FD;text-decoration:none;
+       border:1px solid rgba(59,130,246,.35);background:rgba(59,130,246,.12);border-radius:9px;
+       padding:6px 12px">画板 →</a>
+  </div>
+  <div class="tabs" id="tabs"></div>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<div class="viewer" id="viewer">
+  <div class="vbar">
+    <span class="n" id="vno">01 / 26</span>
+    <span class="t" id="vttl"></span>
+    <div class="x" onclick="closeViewer()">✕</div>
+  </div>
+  <div class="stage"><img id="vimg" alt=""></div>
+  <div class="nav">
+    <div onclick="step(-1)">← 上一屏</div>
+    <div class="pri" onclick="step(1)">下一屏 →</div>
+  </div>
+  <div class="hint">← → 翻页 · Esc 关闭 · 点击图片外区域也可关闭</div>
+</div>
+
+<script>
+const SHOTS = [
+  ['01-home','首页 / 今日概览','main'],
+  ['02-collect-setup','采集条件','main'],
+  ['03-collecting','采集进行中','main'],
+  ['04-shortlist','待投清单','main'],
+  ['05-job-detail','岗位详情 + 三件套','main'],
+  ['06-greeting','话术工作台','main'],
+  ['07-confirm','批量确认','main'],
+  ['08-executing','执行中','main'],
+  ['09-report','核验报告','main'],
+  ['10-ledger','台账 / 漏斗','main'],
+  ['11-chat','会话管家','main'],
+  ['12-form','网申代填','main'],
+  ['13-settings','设置','main'],
+  ['14-overlay','悬浮面板 v1','panel'],
+  ['15-panel-collect','面板 · 采集','panel'],
+  ['16-panel-apply','面板 · 投递','panel'],
+  ['17-panel-reply','面板 · 回复','panel'],
+  ['18-panel-forms','面板 · 三形态','panel'],
+  ['19-p3-screening','v3 自动筛选','panel'],
+  ['20-p3-criteria','v3 筛选条件','panel'],
+  ['21-p3-shortlist','v3 待投列表','panel'],
+  ['22-p3-confirm','v3 投递确认','panel'],
+  ['23-p3-diagnosis','v3 职位诊断','panel'],
+  ['24-p3-reply','v3 回复','panel'],
+  ['25-p3-more','v3 更多','panel'],
+  ['26-p3-verify','v3 验证中断','panel']
+];
+const GROUPS = [['all','全部',SHOTS.length],['main','主界面',13],['panel','悬浮面板',13]];
+let filter='all', cur=0, view=[];
+
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = GROUPS.map(([k,label,n])=>
+    `<div class="tab ${k===filter?'on':''}" onclick="setFilter('${k}')">${label}<b>${n}</b></div>`
+  ).join('');
+}
+function setFilter(k){ filter=k; renderTabs(); renderGrid(); }
+
+function renderGrid(){
+  view = SHOTS.filter(s=> filter==='all' || s[2]===filter);
+  document.getElementById('grid').innerHTML = view.map((s,i)=>{
+    const no = SHOTS.indexOf(s)+1;
+    return `<div class="card" onclick="openViewer(${i})">
+      <img loading="lazy" src="shots/${s[0]}.png" alt="${s[1]}">
+      <div class="cap"><span class="no">${String(no).padStart(2,'0')}</span>
+        <span class="ttl">${s[1]}</span>
+        <span class="grp ${s[2]==='panel'?'p':''}">${s[2]==='panel'?'悬浮面板':'主界面'}</span></div>
+    </div>`;
+  }).join('');
+  document.getElementById('meta').textContent =
+    `${view.length} 屏 · v2.0 · 1280×854 · 点任意一张看大图`;
+}
+
+function openViewer(i){
+  cur = i;
+  document.getElementById('viewer').classList.add('on');
+  paint();
+}
+function closeViewer(){ document.getElementById('viewer').classList.remove('on'); }
+function step(d){
+  cur = (cur + d + view.length) % view.length;
+  paint();
+}
+function paint(){
+  const s = view[cur];
+  const no = SHOTS.indexOf(s)+1;
+  document.getElementById('vimg').src = `shots/${s[0]}.png`;
+  document.getElementById('vno').textContent = String(no).padStart(2,'0') + ' / ' + SHOTS.length;
+  document.getElementById('vttl').textContent = s[1];
+}
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('viewer').classList.contains('on')) return;
+  if(e.key==='ArrowRight') step(1);
+  if(e.key==='ArrowLeft') step(-1);
+  if(e.key==='Escape') closeViewer();
+});
+document.getElementById('viewer').addEventListener('click', e=>{
+  if(e.target.id==='viewer') closeViewer();
+});
+
+renderTabs(); renderGrid();
+</script>
+</body>
+</html>

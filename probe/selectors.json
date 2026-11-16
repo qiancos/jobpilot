@@ -1,0 +1,86 @@
+{
+  "$comment": "BOSS 直聘网页版 DOM 选择器。这是唯一出口——页面改版只改这个文件，不重装 App。",
+  "version": "0.3.0",
+  "verified": {
+    "at": "2026-11-16",
+    "device": "vivo PA2573 · Android 16 · 2064x3096 @400dpi",
+    "context": "WebView + 桌面 UA（Chrome 126 / Windows）· 未登录态",
+    "webdriver": false,
+    "security_page": "未出现"
+  },
+
+  "pages": {
+    "jobs": {
+      "url": "https://www.zhipin.com/web/geek/jobs?query={query}&city={city}",
+      "city": { "guangzhou": "101280100", "shenzhen": "101280600" },
+      "status": "verified (2026-11-16, 采集 15/15 无空值)",
+      "selectors": {
+        "cardContainer": "div.job-card-wrap",
+        "title": "a.job-name",
+        "tags": "ul.tag-list li",
+        "company": "span.boss-name",
+        "area": "span.company-location",
+        "footer": "div.job-card-footer",
+        "info": "div.job-info",
+        "salary": null
+      },
+      "counts": {
+        "cardContainer": 15,
+        "title": 15,
+        "tags": 15,
+        "company": 15,
+        "area": 15,
+        "salary": 0
+      },
+      "notes": [
+        "卡片单位是 div.job-card-wrap（里面是 li.job-card-box + div.job-card-footer），不是 li 本身",
+        "★ 地区和公司都在 footer 里：span.company-location / span.boss-name。对 li 做 querySelector 拿不到",
+        "★ 列表卡片里没有薪资（.job-salary 计数为 0），薪资只在右侧详情面板/详情页出现；M3 再补抓",
+        "未登录时滚到底会出现「登录账号，查看更多好职位」拦截，一次最多约 15 条"
+      ]
+    },
+
+    "detail": {
+      "url": "https://www.zhipin.com/job_detail/{jobId}.html",
+      "status": "verified-partial",
+      "selectors": {
+        "startChat": "a.btn-startchat, .btn-startchat",
+        "section": ".job-detail-section",
+        "infoJob": ".info-job",
+        "jdText": ".job-sec-text",
+        "salary": ".job-salary",
+        "company": ".company-info, .sider-company",
+        "similarJob": ".similar-job-info"
+      },
+      "counts": { "startChat": 2, "section": 7 },
+      "notes": [
+        "startChat 命中 2 个：顶部主按钮 + 底部悬浮条，取第一个即可",
+        "未登录时 JD 只显示摘要，完整内容要登录",
+        "未登录时右侧是手机号+验证码登录框"
+      ]
+    },
+
+    "chat": {
+      "url": "https://www.zhipin.com/web/geek/chat",
+      "status": "pending",
+      "selectors": {
+        "convItem": ".user-list li",
+        "selfMsg": ".item-myself",
+        "otherMsg": ".item-friend",
+        "input": "[contenteditable=\"true\"]",
+        "header": ".chat-header"
+      },
+      "notes": [
+        "待登录后验证",
+        "已知坑：会话列表按最近回复重排，所以禁止坐标点击，必须用 DOM 直选 + 公司名双重校验"
+      ]
+    }
+  },
+
+  "pending": [
+    "登录后重跑 jobs / detail，确认登录态下选择器不变、能否突破 15 条上限",
+    "chat 页四个选择器 + 发送键是否可用",
+    "『今日沟通次数』配额提示的 DOM 位置与文案",
+    "出现验证码/滑块时的 DOM 特征（用于熔断判定）"
+  ]
+}
